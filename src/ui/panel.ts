@@ -67,23 +67,27 @@ export function createUI() {
                     <span class="op-title-text">Positioning</span>
                 </div>
                 <div class="op-title-right">
-                    <span class="op-muted" id="op-offset-indicator">Offset X 0, Y 0</span>
                     <button class="op-chevron" id="op-collapse-positioning" title="Collapse/Expand">▾</button>
                 </div>
             </div>
             <div id="op-positioning-body">
-                <div class="op-row space">
-                    <div>
+                <div class="op-row-col">
+                    <div class="op-row space-between">
                         <span class="op-muted" id="op-place-label">Place overlay:</span>
-                        <div class="op-small-text">Click a pixel on the canvas to set the anchor.</div>
+                        <span class="op-muted" id="op-offset-indicator">Offset X 0, Y 0</span>
                     </div>
-                    <button class="op-button" id="op-autocap-toggle" title="Capture next clicked pixel as anchor">Disabled</button>
                 </div>
-                <div class="op-nudge-row" style="text-align: right;">
-                    <button class="op-icon-btn" id="op-nudge-left" title="Left">←</button>
-                    <button class="op-icon-btn" id="op-nudge-down" title="Down">↓</button>
-                    <button class="op-icon-btn" id="op-nudge-up" title="Up">↑</button>
-                    <button class="op-icon-btn" id="op-nudge-right" title="Right">→</button>
+                <div class="op-row">
+                    <button class="op-button" id="op-autocap-toggle" title="Capture next clicked pixel as anchor">Disabled</button>
+                    <div class="op-nudge-row" style="margin-left:auto;">
+                        <button class="op-icon-btn" id="op-nudge-left" title="Left">←</button>
+                        <button class="op-icon-btn" id="op-nudge-down" title="Down">↓</button>
+                        <button class="op-icon-btn" id="op-nudge-up" title="Up">↑</button>
+                        <button class="op-icon-btn" id="op-nudge-right" title="Right">→</button>
+                    </div>
+                </div>
+                <div class="op-row center">
+                    <div class="op-small-text">Click a pixel on the canvas to set the anchor.</div>
                 </div>
             </div>
         </div>

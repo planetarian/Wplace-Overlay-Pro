@@ -50,6 +50,9 @@ export function injectStyles() {
 
       .op-row { display: flex; align-items: center; gap: 8px; }
       .op-row.space { justify-content: space-between; }
+      .op-row.center { justify-content: center; text-align: center; }
+      .op-row-col { display: flex; flex-direction: column; gap: 4px; }
+      .space-between { justify-content: space-between; }
       .op-small-text { font-size: 11px; color: var(--op-muted); }
 
       .op-button { background: var(--op-btn); color: var(--op-text); border: 1px solid var(--op-btn-border); border-radius: 10px; padding: 6px 10px; cursor: pointer; }
