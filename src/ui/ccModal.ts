@@ -4,7 +4,7 @@ import { createCanvas } from '../core/canvas';
 import { config, saveConfig } from '../core/store';
 import { MAX_OVERLAY_DIM } from '../core/constants';
 import { ensureHook } from '../core/hook';
-import { clearOverlayCache } from '../core/cache';
+import { clearOverlayCache, paletteDetectionCache } from '../core/cache';
 import { showToast } from '../core/toast';
 
 // dispatch when an overlay image is updated
@@ -177,6 +177,10 @@ export function buildCCModal() {
     }
     const dataUrl = cc!.processedCanvas.toDataURL('image/png');
     ov.imageBase64 = dataUrl; ov.imageUrl = null; ov.isLocal = true;
+    
+    // Mark the processed image as palette-perfect for optimization
+    paletteDetectionCache.set(dataUrl, true);
+    
     await saveConfig(['overlays']); clearOverlayCache(); ensureHook();
     emitOverlayChanged();
     const uniqueColors = Object.keys(cc!.lastColorCounts).length;

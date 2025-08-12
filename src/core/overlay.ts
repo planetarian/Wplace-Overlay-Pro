@@ -1,6 +1,6 @@
 import { createCanvas, createHTMLCanvas, canvasToBlob, blobToImage, loadImage } from './canvas';
 import { MINIFY_SCALE, MINIFY_SCALE_SYMBOL, TILE_SIZE, MAX_OVERLAY_DIM } from './constants';
-import { imageDecodeCache, overlayCache, tooLargeOverlays } from './cache';
+import { imageDecodeCache, overlayCache, tooLargeOverlays, paletteDetectionCache, baseMinifyCache } from './cache';
 import { showToast } from './toast';
 import { config } from './store';
 import { WPLACE_FREE, WPLACE_PAID, SYMBOL_TILES, SYMBOL_W, SYMBOL_H } from './palette';
@@ -8,6 +8,33 @@ import { WPLACE_FREE, WPLACE_PAID, SYMBOL_TILES, SYMBOL_W, SYMBOL_H } from './pa
 const ALL_COLORS = [...WPLACE_FREE, ...WPLACE_PAID];
 const colorIndexMap = new Map<string, number>();
 ALL_COLORS.forEach((c, i) => colorIndexMap.set(c.join(','), i));
+
+const LUT_SIZE = 32; // 32x32x32 = 32KB
+const LUT_SHIFT = 8 - Math.log2(LUT_SIZE); // 3 for 32x32x32
+const colorLUT = new Uint8Array(LUT_SIZE * LUT_SIZE * LUT_SIZE);
+
+function buildColorLUT() {
+  for (let r = 0; r < LUT_SIZE; r++) {
+    for (let g = 0; g < LUT_SIZE; g++) {
+      for (let b = 0; b < LUT_SIZE; b++) {
+        const realR = (r << LUT_SHIFT) | ((1 << LUT_SHIFT) - 1);
+        const realG = (g << LUT_SHIFT) | ((1 << LUT_SHIFT) - 1);
+        const realB = (b << LUT_SHIFT) | ((1 << LUT_SHIFT) - 1);
+        const index = findClosestColorIndex(realR, realG, realB);
+        colorLUT[r * LUT_SIZE * LUT_SIZE + g * LUT_SIZE + b] = index;
+      }
+    }
+  }
+}
+
+function findColorIndexLUT(r: number, g: number, b: number): number {
+  const lutR = r >> LUT_SHIFT;
+  const lutG = g >> LUT_SHIFT;
+  const lutB = b >> LUT_SHIFT;
+  return colorLUT[lutR * LUT_SIZE * LUT_SIZE + lutG * LUT_SIZE + lutB];
+}
+
+buildColorLUT();
 
 function findClosestColorIndex(r: number, g: number, b: number) {
   let minDistance = Infinity;
@@ -71,6 +98,36 @@ export function rectIntersect(ax: number, ay: number, aw: number, ah: number, bx
   return { x, y, w, h };
 }
 
+function isPalettePerfectImage(img: HTMLImageElement): boolean {
+  const key = img.src;
+  const cached = paletteDetectionCache.get(key);
+  if (cached !== undefined) return cached;
+
+  const canvas = createCanvas(img.width, img.height) as any;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0);
+  const imageData = ctx.getImageData(0, 0, img.width, img.height);
+  const data = imageData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+    
+    if (a === 0) continue;
+    
+    // Skip #deface transparency
+    if (r === 0xde && g === 0xfa && b === 0xce) continue;
+    
+    const colorKey = `${r},${g},${b}`;
+    if (!colorIndexMap.has(colorKey)) {
+      paletteDetectionCache.set(key, false);
+      return false;
+    }
+  }
+  
+  paletteDetectionCache.set(key, true);
+  return true;
+}
+
 export async function decodeOverlayImage(imageBase64: string | null) {
   if (!imageBase64) return null;
   const key = imageBase64;
@@ -87,9 +144,10 @@ export function overlaySignature(ov: {
   offsetX: number,
   offsetY: number,
   opacity: number,
-}) {
+}, isPalettePerfect?: boolean) {
   const imgKey = ov.imageBase64 ? ov.imageBase64.slice(0, 64) + ':' + ov.imageBase64.length : 'none';
-  return [imgKey, ov.pixelUrl || 'null', ov.offsetX, ov.offsetY, ov.opacity].join('|');
+  const perfectFlag = isPalettePerfect !== undefined ? (isPalettePerfect ? 'P' : 'I') : 'U';
+  return [imgKey, ov.pixelUrl || 'null', ov.offsetX, ov.offsetY, ov.opacity, perfectFlag].join('|');
 }
 
 export async function buildOverlayDataForChunkUnified(
@@ -121,7 +179,9 @@ export async function buildOverlayDataForChunkUnified(
   const drawX = (base.chunk1 * TILE_SIZE + base.posX + ov.offsetX) - (targetChunk1 * TILE_SIZE);
   const drawY = (base.chunk2 * TILE_SIZE + base.posY + ov.offsetY) - (targetChunk2 * TILE_SIZE);
 
-  const sig = overlaySignature(ov);
+  // Check if image is palette-perfect for optimization
+  const isPalettePerfect = isPalettePerfectImage(img);
+  const sig = overlaySignature(ov, isPalettePerfect);
   const cacheKey = `ov:${ov.id}|sig:${sig}|tile:${targetChunk1},${targetChunk2}|mode:${mode}`;
   const cached = overlayCache.get(cacheKey);
   if (cached !== undefined) return cached;
@@ -181,6 +241,10 @@ export async function buildOverlayDataForChunkUnified(
       const outputImageData = outCtx.createImageData(tileW, tileH);
       const outData = outputImageData.data;
 
+      // Precompute symbol centering offsets for performance
+      const centerX = (scale - SYMBOL_W) >> 1;
+      const centerY = (scale - SYMBOL_H) >> 1;
+      
       for (let y = 0; y < TILE_SIZE; y++) {
         for (let x = 0; x < TILE_SIZE; x++) {
           const imgX = x - drawX;
@@ -192,30 +256,44 @@ export async function buildOverlayDataForChunkUnified(
             const b = originalImageData.data[idx+2];
             const a = originalImageData.data[idx+3];
 
-            if (a > 128 && !(r === 0xde && g === 0xfa && b === 0xce)) {
-              const colorIndex = findClosestColorIndex(r, g, b);
-              if (colorIndex < SYMBOL_TILES.length) {
-                const symbol = SYMBOL_TILES[colorIndex];
-                const tileX = Math.floor(x * scale);
-                const tileY = Math.floor(y * scale);
-                const a_r = ALL_COLORS[colorIndex][0];
-                const a_g = ALL_COLORS[colorIndex][1];
-                const a_b = ALL_COLORS[colorIndex][2];
+            // Early exit for transparent or deface pixels
+            if (a <= 128 || (r === 0xde && g === 0xfa && b === 0xce)) continue;
 
-                for (let sy = 0; sy < SYMBOL_H; sy++) {
-                  for (let sx = 0; sx < SYMBOL_W; sx++) {
-                    const bit_idx = sy * SYMBOL_W + sx;
-                    const bit = (symbol >>> bit_idx) & 1;
-                    if (bit) {
-                        const outX = tileX + sx + Math.floor((scale - SYMBOL_W) / 2);
-                        const outY = tileY + sy + Math.floor((scale - SYMBOL_H) / 2);
-                      if (outX >= 0 && outX < tileW && outY >= 0 && outY < tileH) {
-                        const outIdx = (outY * tileW + outX) * 4;
-                        outData[outIdx] = a_r;
-                        outData[outIdx+1] = a_g;
-                        outData[outIdx+2] = a_b;
-                        outData[outIdx+3] = 255;
-                      }
+            let colorIndex: number;
+            
+            // Fast path for palette-perfect images
+            if (isPalettePerfect) {
+              const colorKey = `${r},${g},${b}`;
+              colorIndex = colorIndexMap.get(colorKey) ?? 0;
+            } else {
+              // Use LUT for fast color matching
+              colorIndex = findColorIndexLUT(r, g, b);
+            }
+
+            if (colorIndex < SYMBOL_TILES.length) {
+              const symbol = SYMBOL_TILES[colorIndex];
+              const tileX = x * scale;
+              const tileY = y * scale;
+              
+              // Cache palette color to avoid repeated array access
+              const paletteColor = ALL_COLORS[colorIndex];
+              const a_r = paletteColor[0];
+              const a_g = paletteColor[1];
+              const a_b = paletteColor[2];
+
+              for (let sy = 0; sy < SYMBOL_H; sy++) {
+                for (let sx = 0; sx < SYMBOL_W; sx++) {
+                  const bit_idx = sy * SYMBOL_W + sx;
+                  const bit = (symbol >>> bit_idx) & 1;
+                  if (bit) {
+                    const outX = tileX + sx + centerX;
+                    const outY = tileY + sy + centerY;
+                    if (outX >= 0 && outX < tileW && outY >= 0 && outY < tileH) {
+                      const outIdx = (outY * tileW + outX) * 4;
+                      outData[outIdx] = a_r;
+                      outData[outIdx+1] = a_g;
+                      outData[outIdx+2] = a_b;
+                      outData[outIdx+3] = 255;
                     }
                   }
                 }
@@ -291,10 +369,22 @@ export async function composeTileUnified(
   if (mode === 'minify') {
     const scale = config.minifyStyle === 'symbols' ? MINIFY_SCALE_SYMBOL : MINIFY_SCALE;
     const w = originalImage.width, h = originalImage.height;
+    
+    const baseCacheKey = `base:${originalBlob.size}:${w}x${h}:${scale}:${config.minifyStyle}`;
+    let scaledBaseImageData = baseMinifyCache.get(baseCacheKey);
+    
+    if (!scaledBaseImageData) {
+      const baseCanvas = createCanvas(w * scale, h * scale) as any;
+      const baseCtx = baseCanvas.getContext('2d', { willReadFrequently: true })!;
+      baseCtx.imageSmoothingEnabled = false;
+      baseCtx.drawImage(originalImage, 0, 0, w * scale, h * scale);
+      scaledBaseImageData = baseCtx.getImageData(0, 0, w * scale, h * scale);
+      baseMinifyCache.set(baseCacheKey, scaledBaseImageData);
+    }
+    
     const canvas = createCanvas(w * scale, h * scale) as any;
     const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(originalImage, 0, 0, w * scale, h * scale);
+    ctx.putImageData(scaledBaseImageData, 0, 0);
 
     for (const ovd of overlayDatas) {
       if (!ovd) continue;
