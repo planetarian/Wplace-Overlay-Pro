@@ -281,9 +281,7 @@ function addEventListeners(panel: HTMLDivElement) {
     btn.addEventListener('click', () => {
         const mode = btn.getAttribute('data-mode') as 'above' | 'minify' | 'original';
         if (mode === 'above') {
-            if (config.overlayMode !== 'behind') {
-                config.overlayMode = 'above';
-            }
+            config.overlayMode = 'behind';
         } else {
             config.overlayMode = mode;
         }
