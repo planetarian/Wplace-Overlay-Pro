@@ -1,7 +1,31 @@
 import { createCanvas, createHTMLCanvas, canvasToBlob, blobToImage, loadImage } from './canvas';
-import { MINIFY_SCALE, TILE_SIZE, MAX_OVERLAY_DIM } from './constants';
+import { MINIFY_SCALE, MINIFY_SCALE_SYMBOL, TILE_SIZE, MAX_OVERLAY_DIM } from './constants';
 import { imageDecodeCache, overlayCache, tooLargeOverlays } from './cache';
 import { showToast } from './toast';
+import { config } from './store';
+import { WPLACE_FREE, WPLACE_PAID, SYMBOL_TILES, SYMBOL_W, SYMBOL_H } from './palette';
+
+const ALL_COLORS = [...WPLACE_FREE, ...WPLACE_PAID];
+const colorIndexMap = new Map<string, number>();
+ALL_COLORS.forEach((c, i) => colorIndexMap.set(c.join(','), i));
+
+function findClosestColorIndex(r: number, g: number, b: number) {
+  let minDistance = Infinity;
+  let index = 0;
+  for (let i = 0; i < ALL_COLORS.length; i++) {
+    const color = ALL_COLORS[i];
+    const distance = Math.sqrt(
+      Math.pow(r - color[0], 2) +
+      Math.pow(g - color[1], 2) +
+      Math.pow(b - color[2], 2)
+    );
+    if (distance < minDistance) {
+      minDistance = distance;
+      index = i;
+    }
+  }
+  return index;
+}
 
 export function extractPixelCoords(pixelUrl: string) {
   try {
@@ -102,7 +126,7 @@ export async function buildOverlayDataForChunkUnified(
   const cached = overlayCache.get(cacheKey);
   if (cached !== undefined) return cached;
 
-  const colorStrength = ov.opacity;
+  const colorStrength = (mode === 'minify') ? 1.0 : ov.opacity;
   const whiteStrength = 1 - colorStrength;
 
   if (mode !== 'minify') {
@@ -117,10 +141,15 @@ export async function buildOverlayDataForChunkUnified(
     const data = imageData.data;
 
     for (let i = 0; i < data.length; i += 4) {
-      if (data[i + 3] > 0) {
-        data[i]     = Math.round(data[i]     * colorStrength + 255 * whiteStrength);
-        data[i + 1] = Math.round(data[i + 1] * colorStrength + 255 * whiteStrength);
-        data[i + 2] = Math.round(data[i + 2] * colorStrength + 255 * whiteStrength);
+      const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+      // Special case for #deface color
+      if (r === 0xde && g === 0xfa && b === 0xce) {
+        continue;
+      }
+      if (a > 0) {
+        data[i]     = Math.round(r * colorStrength + 255 * whiteStrength);
+        data[i + 1] = Math.round(g * colorStrength + 255 * whiteStrength);
+        data[i + 2] = Math.round(b * colorStrength + 255 * whiteStrength);
         data[i + 3] = 255;
       }
     }
@@ -129,50 +158,125 @@ export async function buildOverlayDataForChunkUnified(
     overlayCache.set(cacheKey, result);
     return result;
   } else {
-    const scale = MINIFY_SCALE;
-    const tileW = TILE_SIZE * scale;
-    const tileH = TILE_SIZE * scale;
-    const drawXScaled = Math.round(drawX * scale);
-    const drawYScaled = Math.round(drawY * scale);
-    const wScaled = wImg * scale;
-    const hScaled = hImg * scale;
+    if (config.minifyStyle === 'symbols') {
+      const scale = MINIFY_SCALE_SYMBOL;
+      const tileW = TILE_SIZE * scale;
+      const tileH = TILE_SIZE * scale;
+      const drawXScaled = Math.round(drawX * scale);
+      const drawYScaled = Math.round(drawY * scale);
+      const wScaled = wImg * scale;
+      const hScaled = hImg * scale;
 
-    const isect = rectIntersect(0, 0, tileW, tileH, drawXScaled, drawYScaled, wScaled, hScaled);
-    if (isect.w === 0 || isect.h === 0) { overlayCache.set(cacheKey, null); return null; }
+      const isect = rectIntersect(0, 0, tileW, tileH, drawXScaled, drawYScaled, wScaled, hScaled);
+      if (isect.w === 0 || isect.h === 0) { overlayCache.set(cacheKey, null); return null; }
 
-    const canvas = createCanvas(tileW, tileH) as any;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, tileW, tileH);
-    ctx.drawImage(img as any, 0, 0, wImg, hImg, drawXScaled, drawYScaled, wScaled, hScaled);
+      const canvas = createCanvas(wImg, hImg) as any;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img as any, 0, 0);
+      const originalImageData = ctx.getImageData(0, 0, wImg, hImg);
 
-    const imageData = ctx.getImageData(isect.x, isect.y, isect.w, isect.h);
-    const data = imageData.data;
-    const center = Math.floor(scale / 2);
-    const width = isect.w;
+      const outCanvas = createCanvas(tileW, tileH) as any;
+      const outCtx = outCanvas.getContext('2d', { willReadFrequently: true })!;
+      const outputImageData = outCtx.createImageData(tileW, tileH);
+      const outData = outputImageData.data;
 
-    for (let i = 0; i < data.length; i += 4) {
-      const a = data[i + 3];
-      if (a === 0) continue;
+      for (let y = 0; y < TILE_SIZE; y++) {
+        for (let x = 0; x < TILE_SIZE; x++) {
+          const imgX = x - drawX;
+          const imgY = y - drawY;
+          if (imgX >= 0 && imgX < wImg && imgY >= 0 && imgY < hImg) {
+            const idx = (imgY * wImg + imgX) * 4;
+            const r = originalImageData.data[idx];
+            const g = originalImageData.data[idx+1];
+            const b = originalImageData.data[idx+2];
+            const a = originalImageData.data[idx+3];
 
-      const px = (i / 4) % width;
-      const py = Math.floor((i / 4) / width);
-      const absX = isect.x + px;
-      const absY = isect.y + py;
+            if (a > 128 && !(r === 0xde && g === 0xfa && b === 0xce)) {
+              const colorIndex = findClosestColorIndex(r, g, b);
+              if (colorIndex < SYMBOL_TILES.length) {
+                const symbol = SYMBOL_TILES[colorIndex];
+                const tileX = Math.floor(x * scale);
+                const tileY = Math.floor(y * scale);
+                const a_r = ALL_COLORS[colorIndex][0];
+                const a_g = ALL_COLORS[colorIndex][1];
+                const a_b = ALL_COLORS[colorIndex][2];
 
-      if ((absX % scale) === center && (absY % scale) === center) {
-        data[i]     = Math.round(data[i]     * colorStrength + 255 * whiteStrength);
-        data[i + 1] = Math.round(data[i + 1] * colorStrength + 255 * whiteStrength);
-        data[i + 2] = Math.round(data[i + 2] * colorStrength + 255 * whiteStrength);
-        data[i + 3] = 255;
-      } else {
-        data[i] = 0; data[i + 1] = 0; data[i + 2] = 0; data[i + 3] = 0;
+                for (let sy = 0; sy < SYMBOL_H; sy++) {
+                  for (let sx = 0; sx < SYMBOL_W; sx++) {
+                    const bit_idx = sy * SYMBOL_W + sx;
+                    const bit = (symbol >>> bit_idx) & 1;
+                    if (bit) {
+                        const outX = tileX + sx + Math.floor((scale - SYMBOL_W) / 2);
+                        const outY = tileY + sy + Math.floor((scale - SYMBOL_H) / 2);
+                      if (outX >= 0 && outX < tileW && outY >= 0 && outY < tileH) {
+                        const outIdx = (outY * tileW + outX) * 4;
+                        outData[outIdx] = a_r;
+                        outData[outIdx+1] = a_g;
+                        outData[outIdx+2] = a_b;
+                        outData[outIdx+3] = 255;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
-    }
+      outCtx.putImageData(outputImageData, 0, 0);
 
-    const result = { imageData, dx: isect.x, dy: isect.y, scaled: true, scale };
-    overlayCache.set(cacheKey, result);
-    return result;
+      const finalIsect = rectIntersect(0, 0, tileW, tileH, 0, 0, tileW, tileH);
+      const finalImageData = outCtx.getImageData(finalIsect.x, finalIsect.y, finalIsect.w, finalIsect.h);
+
+      const result = { imageData: finalImageData, dx: finalIsect.x, dy: finalIsect.y, scaled: true, scale };
+      overlayCache.set(cacheKey, result);
+      return result;
+    } else { // 'dots'
+        const scale = MINIFY_SCALE;
+        const tileW = TILE_SIZE * scale;
+        const tileH = TILE_SIZE * scale;
+        const drawXScaled = Math.round(drawX * scale);
+        const drawYScaled = Math.round(drawY * scale);
+        const wScaled = wImg * scale;
+        const hScaled = hImg * scale;
+
+        const isect = rectIntersect(0, 0, tileW, tileH, drawXScaled, drawYScaled, wScaled, hScaled);
+        if (isect.w === 0 || isect.h === 0) { overlayCache.set(cacheKey, null); return null; }
+
+        const canvas = createCanvas(tileW, tileH) as any;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, tileW, tileH);
+        ctx.drawImage(img as any, 0, 0, wImg, hImg, drawXScaled, drawYScaled, wScaled, hScaled);
+
+        const imageData = ctx.getImageData(isect.x, isect.y, isect.w, isect.h);
+        const data = imageData.data;
+        const center = Math.floor(scale / 2);
+        const width = isect.w;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const a = data[i + 3];
+          if (a === 0) continue;
+
+          const px = (i / 4) % width;
+          const py = Math.floor((i / 4) / width);
+          const absX = isect.x + px;
+          const absY = isect.y + py;
+
+          if ((absX % scale) === center && (absY % scale) === center) {
+            data[i]     = Math.round(data[i]     * colorStrength + 255 * whiteStrength);
+            data[i + 1] = Math.round(data[i + 1] * colorStrength + 255 * whiteStrength);
+            data[i + 2] = Math.round(data[i + 2] * colorStrength + 255 * whiteStrength);
+            data[i + 3] = 255;
+          } else {
+            data[i] = 0; data[i + 1] = 0; data[i + 2] = 0; data[i + 3] = 0;
+          }
+        }
+        const result = { imageData, dx: isect.x, dy: isect.y, scaled: true, scale };
+        overlayCache.set(cacheKey, result);
+        return result;
+    }
   }
 }
 
@@ -185,7 +289,7 @@ export async function composeTileUnified(
   const originalImage = await blobToImage(originalBlob) as any;
 
   if (mode === 'minify') {
-    const scale = MINIFY_SCALE;
+    const scale = config.minifyStyle === 'symbols' ? MINIFY_SCALE_SYMBOL : MINIFY_SCALE;
     const w = originalImage.width, h = originalImage.height;
     const canvas = createCanvas(w * scale, h * scale) as any;
     const ctx = canvas.getContext('2d', { willReadFrequently: true })!;

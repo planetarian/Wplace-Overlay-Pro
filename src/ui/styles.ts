@@ -50,6 +50,7 @@ export function injectStyles() {
 
       .op-row { display: flex; align-items: center; gap: 8px; }
       .op-row.space { justify-content: space-between; }
+      .op-small-text { font-size: 11px; color: var(--op-muted); }
 
       .op-button { background: var(--op-btn); color: var(--op-text); border: 1px solid var(--op-btn-border); border-radius: 10px; padding: 6px 10px; cursor: pointer; }
       .op-button:hover { background: var(--op-btn-hover); }
@@ -66,6 +67,14 @@ export function injectStyles() {
       .op-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
       .op-muted { color: var(--op-muted); font-size: 12px; }
+
+     .op-tabs { padding: 4px; border-bottom: 1px solid var(--op-border); }
+     .op-tab-btn { flex: 1; padding: 6px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--op-text); cursor: pointer; }
+     .op-tab-btn:hover { background: var(--op-btn-hover); }
+     .op-tab-btn.active { background: var(--op-btn); border-color: var(--op-btn-border); font-weight: 600; }
+
+     .op-mode-setting { display: none; padding: 6px; }
+     .op-mode-setting.active { display: flex; flex-direction: column; gap: 8px; }
 
       .op-preview { width: 100%; height: 90px; background: var(--op-bg); display: flex; align-items: center; justify-content: center; border: 2px dashed color-mix(in oklab, var(--op-accent) 40%, var(--op-border)); border-radius: 10px; overflow: hidden; position: relative; cursor: pointer; }
       .op-preview img { max-width: 100%; max-height: 100%; display: block; pointer-events: none; }

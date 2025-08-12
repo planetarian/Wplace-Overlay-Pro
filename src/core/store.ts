@@ -19,6 +19,7 @@ export type Config = {
   overlays: OverlayItem[];
   activeOverlayId: string | null;
   overlayMode: 'behind' | 'above' | 'minify' | 'original';
+  minifyStyle: 'dots' | 'symbols';
   isPanelCollapsed: boolean;
   autoCapturePixelUrl: boolean;
   panelX: number | null;
@@ -26,7 +27,7 @@ export type Config = {
   theme: 'light' | 'dark';
   collapseList: boolean;
   collapseEditor: boolean;
-  collapseNudge: boolean;
+  collapsePositioning: boolean;
   ccFreeKeys: string[];
   ccPaidKeys: string[];
   ccZoom: number;
@@ -37,6 +38,7 @@ export const config: Config = {
   overlays: [],
   activeOverlayId: null,
   overlayMode: 'behind',
+  minifyStyle: 'dots',
   isPanelCollapsed: false,
   autoCapturePixelUrl: false,
   panelX: null,
@@ -44,7 +46,7 @@ export const config: Config = {
   theme: 'light',
   collapseList: false,
   collapseEditor: false,
-  collapseNudge: false,
+  collapsePositioning: false,
   ccFreeKeys: DEFAULT_FREE_KEYS.slice(),
   ccPaidKeys: DEFAULT_PAID_KEYS.slice(),
   ccZoom: 1.0,

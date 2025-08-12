@@ -37,13 +37,55 @@ export function createUI() {
       </div>
       <div class="op-content" id="op-content">
         <div class="op-section">
-          <div class="op-row space">
-            <button class="op-button" id="op-mode-toggle">Mode</button>
-            <div class="op-row">
-              <span class="op-muted" id="op-place-label">Place overlay:</span>
-              <button class="op-button" id="op-autocap-toggle" title="Capture next clicked pixel as anchor">OFF</button>
+          <div class="op-section-title">
+            <div class="op-title-left">
+              <span class="op-title-text">Mode</span>
             </div>
           </div>
+          <div class="op-row op-tabs">
+            <button class="op-tab-btn" data-mode="above">Full Overlay</button>
+            <button class="op-tab-btn" data-mode="minify">Mini-pixel</button>
+            <button class="op-tab-btn" data-mode="original">Disabled</button>
+          </div>
+          <div id="op-mode-settings">
+            <div class="op-mode-setting" data-setting="above">
+                <div class="op-row"><label>Layering</label><div id="op-layering-btns"></div></div>
+                <div class="op-row"><label style="width: 60px;">Opacity</label><input type="range" min="0" max="1" step="0.05" class="op-slider op-grow" id="op-opacity-slider"><span id="op-opacity-value" style="width: 36px; text-align: right;">70%</span></div>
+            </div>
+            <div class="op-mode-setting" data-setting="minify">
+              <div class="op-row"><label>Style</label>
+                <div class="op-row"><input type="radio" name="minify-style" value="dots" id="op-style-dots"><label for="op-style-dots">Dots</label></div>
+                <div class="op-row"><input type="radio" name="minify-style" value="symbols" id="op-style-symbols"><label for="op-style-symbols">Symbols</label></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="op-section" id="op-positioning-section">
+            <div class="op-section-title">
+                <div class="op-title-left">
+                    <span class="op-title-text">Positioning</span>
+                </div>
+                <div class="op-title-right">
+                    <span class="op-muted" id="op-offset-indicator">Offset X 0, Y 0</span>
+                    <button class="op-chevron" id="op-collapse-positioning" title="Collapse/Expand">▾</button>
+                </div>
+            </div>
+            <div id="op-positioning-body">
+                <div class="op-row space">
+                    <div>
+                        <span class="op-muted" id="op-place-label">Place overlay:</span>
+                        <div class="op-small-text">Click a pixel on the canvas to set the anchor.</div>
+                    </div>
+                    <button class="op-button" id="op-autocap-toggle" title="Capture next clicked pixel as anchor">Disabled</button>
+                </div>
+                <div class="op-nudge-row" style="text-align: right;">
+                    <button class="op-icon-btn" id="op-nudge-left" title="Left">←</button>
+                    <button class="op-icon-btn" id="op-nudge-down" title="Down">↓</button>
+                    <button class="op-icon-btn" id="op-nudge-up" title="Up">↑</button>
+                    <button class="op-icon-btn" id="op-nudge-right" title="Right">→</button>
+                </div>
+            </div>
         </div>
 
         <div class="op-section">
@@ -104,32 +146,6 @@ export function createUI() {
             </div>
 
             <div class="op-row"><span class="op-muted" id="op-coord-display"></span></div>
-
-            <div class="op-row" style="width: 100%; gap: 12px; padding: 6px 0;">
-              <label style="width: 60px;">Opacity</label>
-              <input type="range" min="0" max="1" step="0.05" class="op-slider op-grow" id="op-opacity-slider">
-              <span id="op-opacity-value" style="width: 36px; text-align: right;">70%</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="op-section" id="op-nudge-section">
-          <div class="op-section-title">
-            <div class="op-title-left">
-              <span class="op-title-text">Nudge overlay</span>
-            </div>
-            <div class="op-title-right">
-              <span class="op-muted" id="op-offset-indicator">Offset X 0, Y 0</span>
-              <button class="op-chevron" id="op-collapse-nudge" title="Collapse/Expand">▾</button>
-            </div>
-          </div>
-          <div id="op-nudge-body">
-            <div class="op-nudge-row" style="text-align: right;">
-              <button class="op-icon-btn" id="op-nudge-left" title="Left">←</button>
-              <button class="op-icon-btn" id="op-nudge-down" title="Down">↓</button>
-              <button class="op-icon-btn" id="op-nudge-up" title="Up">↑</button>
-              <button class="op-icon-btn" id="op-nudge-right" title="Right">→</button>
-            </div>
           </div>
         </div>
       </div>
@@ -257,14 +273,24 @@ function addEventListeners(panel: HTMLDivElement) {
   $('op-refresh-btn').addEventListener('click', (e) => { e.stopPropagation(); location.reload(); });
   $('op-panel-toggle').addEventListener('click', (e) => { e.stopPropagation(); config.isPanelCollapsed = !config.isPanelCollapsed; saveConfig(['isPanelCollapsed']); updateUI(); });
 
-  $('op-mode-toggle').addEventListener('click', () => {
-    const modes: any[] = ['behind', 'above', 'minify', 'original'];
-    const current = modes.indexOf(config.overlayMode);
-    config.overlayMode = modes[(current + 1) % modes.length] as any;
-    saveConfig(['overlayMode']);
-    ensureHook();
-    updateUI();
+  panel.querySelectorAll('.op-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-mode') as 'above' | 'minify' | 'original';
+        if (mode === 'above') {
+            if (config.overlayMode !== 'behind') {
+                config.overlayMode = 'above';
+            }
+        } else {
+            config.overlayMode = mode;
+        }
+        saveConfig(['overlayMode']);
+        ensureHook();
+        updateUI();
+    });
   });
+  $('op-style-dots').addEventListener('change', () => { if (($('op-style-dots') as HTMLInputElement).checked) { config.minifyStyle = 'dots'; saveConfig(['minifyStyle']); clearOverlayCache(); ensureHook(); }});
+  $('op-style-symbols').addEventListener('change', () => { if (($('op-style-symbols') as HTMLInputElement).checked) { config.minifyStyle = 'symbols'; saveConfig(['minifyStyle']); clearOverlayCache(); ensureHook(); }});
+
   $('op-autocap-toggle').addEventListener('click', () => { config.autoCapturePixelUrl = !config.autoCapturePixelUrl; saveConfig(['autoCapturePixelUrl']); ensureHook(); updateUI(); });
 
   $('op-add-overlay').addEventListener('click', async () => { try { await addBlankOverlay(); } catch (e) { console.error(e); } });
@@ -272,7 +298,7 @@ function addEventListeners(panel: HTMLDivElement) {
   $('op-export-overlay').addEventListener('click', () => exportActiveOverlayToClipboard());
   $('op-collapse-list').addEventListener('click', () => { config.collapseList = !config.collapseList; saveConfig(['collapseList']); updateUI(); });
   $('op-collapse-editor').addEventListener('click', () => { config.collapseEditor = !config.collapseEditor; saveConfig(['collapseEditor']); updateUI(); });
-  $('op-collapse-nudge').addEventListener('click', () => { config.collapseNudge = !config.collapseNudge; saveConfig(['collapseNudge']); updateUI(); });
+  $('op-collapse-positioning').addEventListener('click', () => { config.collapsePositioning = !config.collapsePositioning; saveConfig(['collapsePositioning']); updateUI(); });
 
   $('op-name').addEventListener('change', async (e: any) => {
     const ov = getActiveOverlay(); if (!ov) return;
@@ -425,12 +451,13 @@ function updateEditorUI() {
   }
 
   const coords = ov.pixelUrl ? extractPixelCoords(ov.pixelUrl) : { chunk1: '-', chunk2: '-', posX: '-', posY: '-' } as any;
-  $('op-coord-display').textContent = ov.pixelUrl
-    ? `Ref: chunk ${coords.chunk1}/${coords.chunk2} at (${coords.posX}, ${coords.posY})`
-    : `No pixel anchor set. Turn ON "Place overlay" and click a pixel once.`;
-
-  ( $('op-opacity-slider') as HTMLInputElement ).value = String(ov.opacity);
-  $('op-opacity-value').textContent = Math.round(ov.opacity * 100) + '%';
+  const coordDisplay = $('op-coord-display');
+  if(coordDisplay) {
+    coordDisplay.textContent = ov.pixelUrl
+      ? `Ref: chunk ${coords.chunk1}/${coords.chunk2} at (${coords.posX}, ${coords.posY})`
+      : `No pixel anchor set. Enable placement and click a pixel.`;
+  }
+  
 
   const indicator = $('op-offset-indicator');
   if (indicator) indicator.textContent = `Offset X ${ov.offsetX}, Y ${ov.offsetY}`;
@@ -452,25 +479,71 @@ export function updateUI() {
   toggle.textContent = collapsed ? '▸' : '▾';
   toggle.title = collapsed ? 'Expand' : 'Collapse';
 
-  const modeBtn = $('op-mode-toggle');
-  const modeMap: any = { behind: 'Overlay Behind', above: 'Overlay Above', minify: `Minified`, original: 'Original' };
-  modeBtn.textContent = `Mode: ${modeMap[config.overlayMode] || 'Original'}`;
+  // --- Mode Tabs ---
+  panelEl.querySelectorAll('.op-tab-btn').forEach(btn => {
+    const mode = btn.getAttribute('data-mode');
+    let isActive = false;
+    if (mode === 'above' && (config.overlayMode === 'above' || config.overlayMode === 'behind')) {
+        isActive = true;
+    } else {
+        isActive = mode === config.overlayMode;
+    }
+    btn.classList.toggle('active', isActive);
+  });
 
+  // --- Mode Settings ---
+  const fullOverlaySettings = $('op-mode-settings').querySelector('[data-setting="above"]') as HTMLDivElement;
+  const minifySettings = $('op-mode-settings').querySelector('[data-setting="minify"]') as HTMLDivElement;
+
+  if (config.overlayMode === 'above' || config.overlayMode === 'behind') {
+    fullOverlaySettings.classList.add('active');
+    minifySettings.classList.remove('active');
+    const ov = getActiveOverlay();
+    if(ov) {
+        ( $('op-opacity-slider') as HTMLInputElement ).value = String(ov.opacity);
+        $('op-opacity-value').textContent = Math.round(ov.opacity * 100) + '%';
+    }
+  } else if (config.overlayMode === 'minify') {
+    fullOverlaySettings.classList.remove('active');
+    minifySettings.classList.add('active');
+  } else {
+    fullOverlaySettings.classList.remove('active');
+    minifySettings.classList.remove('active');
+  }
+
+  ($('op-style-dots') as HTMLInputElement).checked = config.minifyStyle === 'dots';
+  ($('op-style-symbols') as HTMLInputElement).checked = config.minifyStyle === 'symbols';
+  
+  const layeringBtns = $('op-layering-btns');
+  layeringBtns.innerHTML = '';
+  const behindBtn = document.createElement('button');
+  behindBtn.textContent = 'Behind';
+  behindBtn.className = 'op-button' + (config.overlayMode === 'behind' ? ' active' : '');
+  behindBtn.addEventListener('click', () => { config.overlayMode = 'behind'; saveConfig(['overlayMode']); ensureHook(); updateUI(); });
+  const aboveBtn = document.createElement('button');
+  aboveBtn.textContent = 'Above';
+  aboveBtn.className = 'op-button' + (config.overlayMode === 'above' ? ' active' : '');
+  aboveBtn.addEventListener('click', () => { config.overlayMode = 'above'; saveConfig(['overlayMode']); ensureHook(); updateUI(); });
+  layeringBtns.appendChild(behindBtn);
+  layeringBtns.appendChild(aboveBtn);
+
+
+  // --- Positioning Section ---
   const autoBtn = $('op-autocap-toggle');
   const placeLabel = $('op-place-label');
-  autoBtn.textContent = config.autoCapturePixelUrl ? 'ON' : 'OFF';
+  autoBtn.textContent = config.autoCapturePixelUrl ? 'Enabled' : 'Disabled';
   autoBtn.classList.toggle('op-danger', !!config.autoCapturePixelUrl);
-  placeLabel.classList.toggle('op-danger-text', !!config.autoCapturePixelUrl);
+  if(placeLabel) placeLabel.classList.toggle('op-danger-text', !!config.autoCapturePixelUrl);
+
+  const positioningBody = $('op-positioning-body');
+  const positioningCz = $('op-collapse-positioning');
+  if(positioningBody) positioningBody.style.display = config.collapsePositioning ? 'none' : 'block';
+  if (positioningCz) positioningCz.textContent = config.collapsePositioning ? '▸' : '▾';
 
   const listWrap = $('op-list-wrap');
   const listCz = $('op-collapse-list');
   listWrap.style.display = config.collapseList ? 'none' : 'block';
   if (listCz) listCz.textContent = config.collapseList ? '▸' : '▾';
-
-  const nudgeBody = $('op-nudge-body');
-  const nudgeCz = $('op-collapse-nudge');
-  nudgeBody.style.display = config.collapseNudge ? 'none' : 'block';
-  if (nudgeCz) nudgeCz.textContent = config.collapseNudge ? '▸' : '▾';
 
   rebuildOverlayListUI();
   updateEditorUI();
