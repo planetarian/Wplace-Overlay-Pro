@@ -12,6 +12,10 @@ export function setUpdateUI(cb: () => void) {
   updateUICallback = cb;
 }
 
+export function getUpdateUI() {
+  return updateUICallback;
+}
+
 export function overlaysNeedingHook() {
   const hasImage = config.overlays.some(o => o.enabled && o.imageBase64);
   const placing  = !!config.autoCapturePixelUrl && !!config.activeOverlayId;

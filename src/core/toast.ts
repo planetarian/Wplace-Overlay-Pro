@@ -1,6 +1,10 @@
 import { config } from './store';
 
-export function showToast(message: string, duration = 3000) {
+export function showToast(
+  message: string,
+  type: 'info' | 'error' | 'success' = 'info',
+  duration = 3000,
+) {
   let stack = document.getElementById('op-toast-stack');
   if (!stack) {
     stack = document.createElement('div');
@@ -11,7 +15,7 @@ export function showToast(message: string, duration = 3000) {
   stack.classList.toggle('op-dark', config.theme === 'dark');
 
   const t = document.createElement('div');
-  t.className = 'op-toast';
+  t.className = `op-toast op-toast-${type}`;
   t.textContent = message;
   stack.appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));

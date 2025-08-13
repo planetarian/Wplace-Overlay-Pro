@@ -1,9 +1,10 @@
-import { createCanvas, createHTMLCanvas, canvasToBlob, blobToImage, loadImage } from './canvas';
+import { createCanvas, canvasToBlob, blobToImage, loadImage } from './canvas';
 import { MINIFY_SCALE, MINIFY_SCALE_SYMBOL, TILE_SIZE, MAX_OVERLAY_DIM } from './constants';
-import { imageDecodeCache, overlayCache, tooLargeOverlays, paletteDetectionCache, baseMinifyCache } from './cache';
+import { imageDecodeCache, overlayCache, tooLargeOverlays, paletteDetectionCache, baseMinifyCache, clearOverlayCache } from './cache';
 import { showToast } from './toast';
-import { config } from './store';
+import { config, saveConfig, type OverlayItem } from './store';
 import { WPLACE_FREE, WPLACE_PAID, SYMBOL_TILES, SYMBOL_W, SYMBOL_H } from './palette';
+import { getUpdateUI, ensureHook } from './hook';
 
 const ALL_COLORS = [...WPLACE_FREE, ...WPLACE_PAID];
 const colorIndexMap = new Map<string, number>();
@@ -370,9 +371,13 @@ export async function composeTileUnified(
     const scale = config.minifyStyle === 'symbols' ? MINIFY_SCALE_SYMBOL : MINIFY_SCALE;
     const w = originalImage.width, h = originalImage.height;
     
-    const baseCacheKey = `base:${originalBlob.size}:${w}x${h}:${scale}:${config.minifyStyle}`;
+    const arrayBuffer = await originalBlob.arrayBuffer();
+    const view = new DataView(arrayBuffer);
+    const hash = view.getUint32(0, true) ^ view.getUint32(view.byteLength - 4, true);
+
+    const baseCacheKey = `base:${originalBlob.size}:${hash}:${w}x${h}:${scale}:${config.minifyStyle}`;
     let scaledBaseImageData = baseMinifyCache.get(baseCacheKey);
-    
+
     if (!scaledBaseImageData) {
       const baseCanvas = createCanvas(w * scale, h * scale) as any;
       const baseCtx = baseCanvas.getContext('2d', { willReadFrequently: true })!;
@@ -423,5 +428,21 @@ export async function composeTileUnified(
       ctx.drawImage(temp, ovd.dx, ovd.dy);
     }
     return await canvasToBlob(canvas);
+  }
+}
+
+export async function displayImageFromData(newOverlay: OverlayItem) {
+  if (!config.overlays) {
+    config.overlays = [];
+  }
+  config.overlays.push(newOverlay);
+  await saveConfig();
+  
+  clearOverlayCache();
+  ensureHook();
+
+  const updateUI = getUpdateUI();
+  if (updateUI) {
+    updateUI();
   }
 }

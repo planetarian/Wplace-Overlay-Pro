@@ -94,6 +94,10 @@ export function injectStyles() {
       .op-toast { background: rgba(255,255,255,0.98); border: 1px solid #e6ebf2; color: #111827; padding: 8px 12px; border-radius: 10px; font-size: 12px; box-shadow: 0 6px 16px rgba(16,24,40,0.12); opacity: 0; transform: translateY(-6px); transition: opacity .18s ease, transform .18s ease; max-width: 100%; text-align: center; }
       .op-toast.show { opacity: 1; transform: translateY(0); }
       .op-toast-stack.op-dark .op-toast { background: rgba(27,30,36,0.98); border-color: #2a2f3a; color: #f5f6f9; }
+      .op-toast.op-toast-error { background: #fee2e2; border-color: #fecaca; color: #7f1d1d; }
+      .op-toast-stack.op-dark .op-toast.op-toast-error { background: #4a1f1f; border-color: #5b2d2d; color: #fecaca; }
+      .op-toast.op-toast-success { background: #dcfce7; border-color: #bbf7d0; color: #14532d; }
+      .op-toast-stack.op-dark .op-toast.op-toast-success { background: #163822; border-color: #225a35; color: #bbf7d0; }
 
       .op-cc-backdrop { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.45); display: none; }
       .op-cc-backdrop.show { display: block; }
