@@ -9,3 +9,7 @@ export function uniqueName(base: string, existing: string[]) {
   while (names.has(`${base} (${i})`.toLowerCase())) i++;
   return `${base} (${i})`;
 }
+
+export function serverTPtoDisplayTP(tile: number[], pixel: number[]) {
+  return [((tile[0] % 4) * 1000) + pixel[0], ((tile[1] % 4) * 1000) + pixel[1]];
+}
