@@ -1,3 +1,5 @@
+import { showToast } from '../core/toast';
+
 let target: HTMLElement | null = null;
 let container: HTMLSpanElement | null = null;
 let textEl: HTMLSpanElement | null = null;
@@ -45,7 +47,10 @@ export function updatePixelCoords(chunk1: number, chunk2: number, posX: number, 
   }
 
   if (copyBtn) {
-    copyBtn.onclick = () => navigator.clipboard.writeText(`${chunk1} ${chunk2} ${posX} ${posY}`);
+    copyBtn.onclick = () =>
+      navigator.clipboard
+        .writeText(`${chunk1} ${chunk2} ${posX} ${posY}`)
+        .then(() => showToast('Coordinates copied successfully ✅', 'success'));
   }
 }
 
