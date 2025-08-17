@@ -223,13 +223,17 @@ export async function buildOverlayDataForChunkUnified(
       const scale = MINIFY_SCALE_SYMBOL;
       const tileW = TILE_SIZE * scale;
       const tileH = TILE_SIZE * scale;
-      const drawXScaled = Math.round(drawX * scale);
-      const drawYScaled = Math.round(drawY * scale);
-      const wScaled = wImg * scale;
-      const hScaled = hImg * scale;
 
-      const isect = rectIntersect(0, 0, tileW, tileH, drawXScaled, drawYScaled, wScaled, hScaled);
-      if (isect.w === 0 || isect.h === 0) { overlayCache.set(cacheKey, null); return null; }
+      // Determine intersection in unscaled coordinates
+      const isectUnscaled = rectIntersect(0, 0, TILE_SIZE, TILE_SIZE, drawX, drawY, wImg, hImg);
+      if (isectUnscaled.w === 0 || isectUnscaled.h === 0) { overlayCache.set(cacheKey, null); return null; }
+
+      const isect = {
+        x: Math.round(isectUnscaled.x * scale),
+        y: Math.round(isectUnscaled.y * scale),
+        w: Math.round(isectUnscaled.w * scale),
+        h: Math.round(isectUnscaled.h * scale)
+      };
 
       const canvas = createCanvas(wImg, hImg) as any;
       const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
@@ -245,57 +249,61 @@ export async function buildOverlayDataForChunkUnified(
       // Precompute symbol centering offsets for performance
       const centerX = (scale - SYMBOL_W) >> 1;
       const centerY = (scale - SYMBOL_H) >> 1;
-      
-      for (let y = 0; y < TILE_SIZE; y++) {
-        for (let x = 0; x < TILE_SIZE; x++) {
+
+      // Limit iteration to affected region to reduce overhead
+      const startX = isectUnscaled.x;
+      const startY = isectUnscaled.y;
+      const endX = isectUnscaled.x + isectUnscaled.w;
+      const endY = isectUnscaled.y + isectUnscaled.h;
+
+      for (let y = startY; y < endY; y++) {
+        const imgY = y - drawY;
+        for (let x = startX; x < endX; x++) {
           const imgX = x - drawX;
-          const imgY = y - drawY;
-          if (imgX >= 0 && imgX < wImg && imgY >= 0 && imgY < hImg) {
-            const idx = (imgY * wImg + imgX) * 4;
-            const r = originalImageData.data[idx];
-            const g = originalImageData.data[idx+1];
-            const b = originalImageData.data[idx+2];
-            const a = originalImageData.data[idx+3];
+          const idx = (imgY * wImg + imgX) * 4;
+          const r = originalImageData.data[idx];
+          const g = originalImageData.data[idx+1];
+          const b = originalImageData.data[idx+2];
+          const a = originalImageData.data[idx+3];
 
-            // Early exit for transparent or deface pixels
-            if (a <= 128 || (r === 0xde && g === 0xfa && b === 0xce)) continue;
+          // Early exit for transparent or deface pixels
+          if (a <= 128 || (r === 0xde && g === 0xfa && b === 0xce)) continue;
 
-            let colorIndex: number;
-            
-            // Fast path for palette-perfect images
-            if (isPalettePerfect) {
-              const colorKey = `${r},${g},${b}`;
-              colorIndex = colorIndexMap.get(colorKey) ?? 0;
-            } else {
-              // Use LUT for fast color matching
-              colorIndex = findColorIndexLUT(r, g, b);
-            }
+          let colorIndex: number;
 
-            if (colorIndex < SYMBOL_TILES.length) {
-              const symbol = SYMBOL_TILES[colorIndex];
-              const tileX = x * scale;
-              const tileY = y * scale;
-              
-              // Cache palette color to avoid repeated array access
-              const paletteColor = ALL_COLORS[colorIndex];
-              const a_r = paletteColor[0];
-              const a_g = paletteColor[1];
-              const a_b = paletteColor[2];
+          // Fast path for palette-perfect images
+          if (isPalettePerfect) {
+            const colorKey = `${r},${g},${b}`;
+            colorIndex = colorIndexMap.get(colorKey) ?? 0;
+          } else {
+            // Use LUT for fast color matching
+            colorIndex = findColorIndexLUT(r, g, b);
+          }
 
-              for (let sy = 0; sy < SYMBOL_H; sy++) {
-                for (let sx = 0; sx < SYMBOL_W; sx++) {
-                  const bit_idx = sy * SYMBOL_W + sx;
-                  const bit = (symbol >>> bit_idx) & 1;
-                  if (bit) {
-                    const outX = tileX + sx + centerX;
-                    const outY = tileY + sy + centerY;
-                    if (outX >= 0 && outX < tileW && outY >= 0 && outY < tileH) {
-                      const outIdx = (outY * tileW + outX) * 4;
-                      outData[outIdx] = a_r;
-                      outData[outIdx+1] = a_g;
-                      outData[outIdx+2] = a_b;
-                      outData[outIdx+3] = 255;
-                    }
+          if (colorIndex < SYMBOL_TILES.length) {
+            const symbol = SYMBOL_TILES[colorIndex];
+            const tileX = x * scale;
+            const tileY = y * scale;
+
+            // Cache palette color to avoid repeated array access
+            const paletteColor = ALL_COLORS[colorIndex];
+            const a_r = paletteColor[0];
+            const a_g = paletteColor[1];
+            const a_b = paletteColor[2];
+
+            for (let sy = 0; sy < SYMBOL_H; sy++) {
+              for (let sx = 0; sx < SYMBOL_W; sx++) {
+                const bit_idx = sy * SYMBOL_W + sx;
+                const bit = (symbol >>> bit_idx) & 1;
+                if (bit) {
+                  const outX = tileX + sx + centerX;
+                  const outY = tileY + sy + centerY;
+                  if (outX >= 0 && outX < tileW && outY >= 0 && outY < tileH) {
+                    const outIdx = (outY * tileW + outX) * 4;
+                    outData[outIdx] = a_r;
+                    outData[outIdx+1] = a_g;
+                    outData[outIdx+2] = a_b;
+                    outData[outIdx+3] = 255;
                   }
                 }
               }
@@ -305,10 +313,9 @@ export async function buildOverlayDataForChunkUnified(
       }
       outCtx.putImageData(outputImageData, 0, 0);
 
-      const finalIsect = rectIntersect(0, 0, tileW, tileH, 0, 0, tileW, tileH);
-      const finalImageData = outCtx.getImageData(finalIsect.x, finalIsect.y, finalIsect.w, finalIsect.h);
+      const finalImageData = outCtx.getImageData(isect.x, isect.y, isect.w, isect.h);
 
-      const result = { imageData: finalImageData, dx: finalIsect.x, dy: finalIsect.y, scaled: true, scale };
+      const result = { imageData: finalImageData, dx: isect.x, dy: isect.y, scaled: true, scale };
       overlayCache.set(cacheKey, result);
       return result;
     } else { // 'dots'

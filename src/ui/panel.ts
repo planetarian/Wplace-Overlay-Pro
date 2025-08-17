@@ -55,7 +55,7 @@ export function createUI() {
             <div class="op-mode-setting" data-setting="minify">
               <div class="op-row"><label>Style</label>
                 <div class="op-row"><input type="radio" name="minify-style" value="dots" id="op-style-dots"><label for="op-style-dots">Dots</label></div>
-                <div class="op-row"><input type="radio" name="minify-style" value="symbols" id="op-style-symbols"><label for="op-style-symbols">Symbols (slow and buggy, wait 4 fix!)</label></div>
+                <div class="op-row"><input type="radio" name="minify-style" value="symbols" id="op-style-symbols"><label for="op-style-symbols">Symbols</label></div>
               </div>
             </div>
           </div>
