@@ -1,22 +1,27 @@
-import { serverTPtoDisplayTP } from '../core/util';
+let target: HTMLElement | null = null;
+let display: HTMLSpanElement | null = null;
 
 export function updatePixelCoords(chunk1: number, chunk2: number, posX: number, posY: number) {
-  const displayTP = serverTPtoDisplayTP([chunk1, chunk2], [posX, posY]);
-  const spans = document.querySelectorAll('span');
-  for (const el of spans) {
-    if (el.textContent?.trim().includes(`${displayTP[0]}, ${displayTP[1]}`)) {
-      let display = document.getElementById('op-display-coords');
-      const text = `(Tl X: ${chunk1}, Tl Y: ${chunk2}, Px X: ${posX}, Px Y: ${posY})`;
-      if (!display) {
-        display = document.createElement('span');
-        display.id = 'op-display-coords';
-        display.textContent = text;
-        (display.style as any).marginLeft = 'calc(var(--spacing)*3)';
-        display.style.fontSize = 'small';
-        el.parentNode?.parentNode?.parentNode?.insertAdjacentElement('afterend', display);
-      } else {
-        display.textContent = text;
-      }
-    }
+  const dispX = ((chunk1 % 4) * 1000) + posX;
+  const dispY = ((chunk2 % 4) * 1000) + posY;
+
+  if (!target) {
+    const txt = `${dispX}, ${dispY}`;
+    const span = Array.from(document.querySelectorAll('span'))
+      .find(s => s.textContent?.trim().includes(txt));
+    target = span?.parentElement?.parentElement?.parentElement || null;
   }
+
+  if (!target) return;
+
+  if (!display) {
+    display = document.createElement('span');
+    display.id = 'op-display-coords';
+    (display.style as any).marginLeft = 'calc(var(--spacing)*3)';
+    display.style.fontSize = 'small';
+    target.insertAdjacentElement('afterend', display);
+  }
+
+  display.textContent = `(Tl X: ${chunk1}, Tl Y: ${chunk2}, Px X: ${posX}, Px Y: ${posY})`;
 }
+
