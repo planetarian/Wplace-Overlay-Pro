@@ -6,6 +6,7 @@ import { MAX_OVERLAY_DIM } from '../core/constants';
 import { ensureHook } from '../core/hook';
 import { clearOverlayCache, paletteDetectionCache } from '../core/cache';
 import { showToast } from '../core/toast';
+import { updateOverlayColorStats } from '../core/colorFilter';
 
 // dispatch when an overlay image is updated
 function emitOverlayChanged() {
@@ -177,10 +178,11 @@ export function buildCCModal() {
     }
     const dataUrl = cc!.processedCanvas.toDataURL('image/png');
     ov.imageBase64 = dataUrl; ov.imageUrl = null; ov.isLocal = true;
-    
+
     // Mark the processed image as palette-perfect for optimization
     paletteDetectionCache.set(dataUrl, true);
-    
+
+    await updateOverlayColorStats(ov);
     await saveConfig(['overlays']); clearOverlayCache(); ensureHook();
     emitOverlayChanged();
     const uniqueColors = Object.keys(cc!.lastColorCounts).length;

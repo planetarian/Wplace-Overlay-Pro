@@ -5,6 +5,7 @@ import { showToast } from './toast';
 import { config, saveConfig, type OverlayItem } from './store';
 import { WPLACE_FREE, WPLACE_PAID, SYMBOL_TILES, SYMBOL_W, SYMBOL_H } from './palette';
 import { getUpdateUI, ensureHook } from './hook';
+import { updateOverlayColorStats } from './colorFilter';
 
 const ALL_COLORS = [...WPLACE_FREE, ...WPLACE_PAID];
 const colorIndexMap = new Map<string, number>();
@@ -201,12 +202,14 @@ export async function buildOverlayDataForChunkUnified(
     const imageData = ctx.getImageData(isect.x, isect.y, isect.w, isect.h);
     const data = imageData.data;
 
+    const cf = ov.colorFilter;
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
       // Special case for #deface color
       if (r === 0xde && g === 0xfa && b === 0xce) {
         continue;
       }
+      if (cf && cf[`${r},${g},${b}`] === false) { data[i+3] = 0; continue; }
       if (a > 0) {
         data[i]     = Math.round(r * colorStrength + 255 * whiteStrength);
         data[i + 1] = Math.round(g * colorStrength + 255 * whiteStrength);
@@ -256,6 +259,7 @@ export async function buildOverlayDataForChunkUnified(
       const endX = isectUnscaled.x + isectUnscaled.w;
       const endY = isectUnscaled.y + isectUnscaled.h;
 
+      const cf = ov.colorFilter;
       for (let y = startY; y < endY; y++) {
         const imgY = y - drawY;
         for (let x = startX; x < endX; x++) {
@@ -268,6 +272,7 @@ export async function buildOverlayDataForChunkUnified(
 
           // Early exit for transparent or deface pixels
           if (a <= 128 || (r === 0xde && g === 0xfa && b === 0xce)) continue;
+          if (cf && cf[`${r},${g},${b}`] === false) continue;
 
           let colorIndex: number;
 
@@ -341,9 +346,13 @@ export async function buildOverlayDataForChunkUnified(
         const center = Math.floor(scale / 2);
         const width = isect.w;
 
+        const cf = ov.colorFilter;
         for (let i = 0; i < data.length; i += 4) {
           const a = data[i + 3];
           if (a === 0) continue;
+
+          const r = data[i], g = data[i+1], b = data[i+2];
+          if (cf && cf[`${r},${g},${b}`] === false) { data[i]=0; data[i+1]=0; data[i+2]=0; data[i+3]=0; continue; }
 
           const px = (i / 4) % width;
           const py = Math.floor((i / 4) / width);
@@ -351,9 +360,9 @@ export async function buildOverlayDataForChunkUnified(
           const absY = isect.y + py;
 
           if ((absX % scale) === center && (absY % scale) === center) {
-            data[i]     = Math.round(data[i]     * colorStrength + 255 * whiteStrength);
-            data[i + 1] = Math.round(data[i + 1] * colorStrength + 255 * whiteStrength);
-            data[i + 2] = Math.round(data[i + 2] * colorStrength + 255 * whiteStrength);
+            data[i]     = Math.round(r * colorStrength + 255 * whiteStrength);
+            data[i + 1] = Math.round(g * colorStrength + 255 * whiteStrength);
+            data[i + 2] = Math.round(b * colorStrength + 255 * whiteStrength);
             data[i + 3] = 255;
           } else {
             data[i] = 0; data[i + 1] = 0; data[i + 2] = 0; data[i + 3] = 0;
@@ -442,9 +451,10 @@ export async function displayImageFromData(newOverlay: OverlayItem) {
   if (!config.overlays) {
     config.overlays = [];
   }
+  await updateOverlayColorStats(newOverlay);
   config.overlays.push(newOverlay);
   await saveConfig();
-  
+
   clearOverlayCache();
   ensureHook();
 
