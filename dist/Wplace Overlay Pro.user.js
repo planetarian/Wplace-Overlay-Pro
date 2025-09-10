@@ -14,8 +14,8 @@
 // @grant        unsafeWindow
 // @connect      *
 // @run-at       document-start
-// @downloadURL  path/to/Wplace%20Overlay%20Pro.user.js
-// @updateURL    path/to/Wplace%20Overlay%20Pro.meta.js
+// @downloadURL  https://github.com/planetarian/Wplace-Overlay-Pro/raw/refs/heads/master/dist/Wplace%20Overlay%20Pro.user.js
+// @updateURL    https://github.com/planetarian/Wplace-Overlay-Pro/raw/refs/heads/master/src/meta.js
 // ==/UserScript==
 (() => {
   // src/core/gm.ts
