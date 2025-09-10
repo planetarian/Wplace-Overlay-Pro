@@ -93,6 +93,10 @@ export function matchPixelUrl(urlStr: string) {
   } catch { return null; }
 }
 
+export function getPixelUrl(details: any) {
+  return `https://backend.wplace.live/s0/pixel/${details.chunk1}/${details.chunk2}?x=${details.posX}&y=${details.posY}`;
+}
+
 export function rectIntersect(ax: number, ay: number, aw: number, ah: number, bx: number, by: number, bw: number, bh: number) {
   const x = Math.max(ax, bx), y = Math.max(ay, by);
   const r = Math.min(ax + aw, bx + bw), b = Math.min(ay + ah, by + bh);

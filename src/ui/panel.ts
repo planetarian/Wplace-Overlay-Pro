@@ -5,12 +5,12 @@ import { clearOverlayCache } from '../core/cache';
 import { showToast } from '../core/toast';
 import { urlToDataURL, fileToDataURL } from '../core/gm';
 import { uniqueName, uid } from '../core/util';
-import { extractPixelCoords } from '../core/overlay';
+import { extractPixelCoords, getPixelUrl } from '../core/overlay';
 import { buildCCModal, openCCModal } from './ccModal';
 import { buildRSModal, openRSModal } from './rsModal';
 import { EV_ANCHOR_SET, EV_AUTOCAP_CHANGED } from '../core/events';
 import { updateOverlayColorStats, rgbKeyToHex } from '../core/colorFilter';
-import { WPLACE_NAMES } from '../core/palette';
+import { DEFAULT_FREE_KEYS, WPLACE_NAMES } from '../core/palette';
 
 let panelEl: HTMLDivElement | null = null;
 
@@ -38,16 +38,19 @@ export function createUI() {
         </div>
       </div>
       <div class="op-content" id="op-content">
-        <div class="op-section">
+        <div class="op-section" id="op-mode-section">
           <div class="op-section-title">
             <div class="op-title-left">
               <span class="op-title-text">Mode</span>
             </div>
-          </div>
-          <div class="op-row op-tabs">
-            <button class="op-tab-btn" data-mode="above">Full Overlay</button>
-            <button class="op-tab-btn" data-mode="minify">Mini-pixel</button>
-            <button class="op-tab-btn" data-mode="original">Disabled</button>
+            <div class="op-title-right">
+              <div class="op-row">
+                <button class="op-tab-btn" data-mode="above" title="Display full solid-pixel overlay">Full</button>
+                <button class="op-tab-btn" data-mode="minify" title="Display mini-pixel/symbol overlay">Mini</button>
+                <button class="op-tab-btn" data-mode="original" title="Don't display this overlay">Disabled</button>
+                <button class="op-chevron" id="op-collapse-mode" title="Collapse/Expand">▾</button>
+              </div>
+            </div>
           </div>
           <div id="op-mode-settings">
             <div class="op-mode-setting" data-setting="above">
@@ -73,14 +76,28 @@ export function createUI() {
                 </div>
             </div>
             <div id="op-positioning-body">
-                <div class="op-row-col">
-                    <div class="op-row space-between">
-                        <span class="op-muted" id="op-place-label">Place overlay:</span>
-                        <span class="op-muted" id="op-offset-indicator">Offset X 0, Y 0</span>
-                    </div>
-                </div>
-                <div class="op-row">
+                <div class="op-row space-between">
+                    <span class="op-muted" id="op-place-label">Place overlay:</span>
+                    <span>
+                        <input type="checkbox" id="op-place-clear-on-click" class="op-input" checked="checked"/>
+                        <label for="op-place-clear-on-click" class="op-muted">Auto-exit</label>
+                    </span>
                     <button class="op-button" id="op-autocap-toggle" title="Capture next clicked pixel as anchor">Disabled</button>
+                </div>
+                <div class="op-row op-place-coords">
+                    <label for="op-place-chunk-x" class="op-muted">Chunk X:</label>
+                    <input type="text" id="op-place-chunk-x" class="op-input"/>
+                    <label for="op-place-chunk-y" class="op-muted">Y:</label>
+                    <input type="text" id="op-place-chunk-y" class="op-input"/>
+                </div>
+                <div class="op-row op-place-coords">
+                    <label for="op-place-coord-x" class="op-muted">Coord X:</label>
+                    <input type="text" id="op-place-coord-x" class="op-input"/>
+                    <label for="op-place-coord-y" class="op-muted">Y:</label>
+                    <input type="text" id="op-place-coord-y" class="op-input"/>
+                </div>
+                <div class="op-row space-between">
+                    <span class="op-muted" id="op-offset-indicator">Offset X 0, Y 0</span>
                     <div class="op-nudge-row" style="margin-left:auto;">
                         <button class="op-icon-btn" id="op-nudge-left" title="Left">←</button>
                         <button class="op-icon-btn" id="op-nudge-down" title="Down">↓</button>
@@ -88,20 +105,20 @@ export function createUI() {
                         <button class="op-icon-btn" id="op-nudge-right" title="Right">→</button>
                     </div>
                 </div>
-                <div class="op-row center">
+                <div class="op-row center" id="op-place-guide">
                     <div class="op-small-text">Click a pixel on the canvas to set the anchor.</div>
                 </div>
             </div>
         </div>
 
-        <div class="op-section resizable">
+        <div class="op-section">
           <div class="op-section-title">
             <div class="op-title-left">
               <span class="op-title-text">Overlays</span>
             </div>
             <div class="op-title-right">
               <div class="op-row">
-                <button class="op-button" id="op-add-overlay" title="Create a new overlay">+ Add</button>
+                <button class="op-button" id="op-add-overlay" title="Create a new overlay">New</button>
                 <button class="op-button" id="op-import-overlay" title="Import overlay JSON">Import</button>
                 <button class="op-button" id="op-export-overlay" title="Export active overlay JSON">Export</button>
                 <button class="op-chevron" id="op-collapse-list" title="Collapse/Expand">▾</button>
@@ -109,7 +126,7 @@ export function createUI() {
             </div>
           </div>
           <div id="op-list-wrap">
-            <div class="op-list" id="op-overlay-list"></div>
+            <div class="op-list resizable" id="op-overlay-list"></div>
           </div>
         </div>
 
@@ -152,8 +169,22 @@ export function createUI() {
             </div>
 
             <div class="op-row"><span class="op-muted" id="op-coord-display"></span></div>
-            <div class="op-row"><label style="width: 90px;">Color Filter</label></div>
-            <div id="op-color-filter" class="op-color-filter" style="display:none;"></div>
+          </div>
+        </div>
+        <div class="op-section" id="op-colors-section">
+          <div class="op-section-title">
+            <div class="op-title-left">
+              <span class="op-title-text">Colors</span>
+            </div>
+            <div class="op-title-right">
+              <button class="op-button" id="op-colors-all" title="Show all">All</button>
+              <button class="op-button" id="op-colors-free" title="Show free">Free</button>
+              <button class="op-button" id="op-colors-none" title="Show none">None</button>
+              <button class="op-chevron" id="op-collapse-colors" title="Collapse/Expand">▾</button>
+            </div>
+          </div>
+          <div id="op-colors-body">
+            <div id="op-color-filter" class="op-color-filter resizable" style="display:none;"></div>
           </div>
         </div>
       </div>
@@ -170,10 +201,15 @@ export function createUI() {
   document.addEventListener('op-overlay-changed', updateUI);
   document.addEventListener(EV_ANCHOR_SET, (ev: any) => {
     const d = ev?.detail || {};
-    showToast(`Anchor set for "${d.name ?? 'overlay'}": chunk ${d.chunk1}/${d.chunk2} at (${d.posX}, ${d.posY}). Offset reset to (0,0).`);
-    updateUI();
+    handleAnchorSet(d);
+    
   });
   document.addEventListener(EV_AUTOCAP_CHANGED, () => updateUI());
+}
+
+function handleAnchorSet(d) {
+  showToast(`Anchor set for "${d.name ?? 'overlay'}": chunk ${d.chunk1}/${d.chunk2} at (${d.posX}, ${d.posY}). Offset reset to (0,0).`);
+  updateUI();
 }
 
 function rebuildOverlayListUI() {
@@ -224,7 +260,8 @@ async function setOverlayImageFromURL(ov: any, url: string) {
   ov.imageUrl = url; ov.imageBase64 = base64; ov.isLocal = false;
   await updateOverlayColorStats(ov);
   await saveConfig(['overlays']); clearOverlayCache();
-  config.autoCapturePixelUrl = true; await saveConfig(['autoCapturePixelUrl']);
+  config.autoCapturePixelUrl = true;
+  await saveConfig(['autoCapturePixelUrl']);
   ensureHook(); updateUI();
   showToast(`Image loaded. Placement mode ON -- click once to set anchor.`);
 }
@@ -235,7 +272,8 @@ async function setOverlayImageFromFile(ov: any, file: File) {
   ov.imageBase64 = base64; ov.imageUrl = null; ov.isLocal = true;
   await updateOverlayColorStats(ov);
   await saveConfig(['overlays']); clearOverlayCache();
-  config.autoCapturePixelUrl = true; await saveConfig(['autoCapturePixelUrl']);
+  config.autoCapturePixelUrl = true;
+  await saveConfig(['autoCapturePixelUrl']);
   ensureHook(); updateUI();
   showToast(`Local image loaded. Placement mode ON -- click once to set anchor.`);
 }
@@ -279,6 +317,22 @@ function copyText(text: string) {
   return Promise.reject(new Error('Clipboard API not available'));
 }
 
+function updatePlaceCoords() {
+  const chunk1 = ($('op-place-chunk-x') as HTMLInputElement).value;
+  const chunk2 = ($('op-place-chunk-y') as HTMLInputElement).value;
+  const posX = ($('op-place-coord-x') as HTMLInputElement).value;
+  const posY = ($('op-place-coord-y') as HTMLInputElement).value;
+  [chunk1, chunk2, posX, posY].forEach(element => {
+    if (!(typeof element === "number"))
+      return;
+  });
+  const ov = getActiveOverlay();
+  const c = { chunk1, chunk2, posX, posY };
+
+  ov.pixelUrl = getPixelUrl(c);
+  handleAnchorSet({ overlayId: ov.id, name: ov.name, chunk1: c.chunk1, chunk2: c.chunk2, posX: c.posX, posY: c.posY });
+}
+
 function addEventListeners(panel: HTMLDivElement) {
   $('op-theme-toggle').addEventListener('click', async (e) => { e.stopPropagation(); config.theme = config.theme === 'light' ? 'dark' : 'light'; await saveConfig(['theme']); applyTheme(); });
   $('op-refresh-btn').addEventListener('click', (e) => { e.stopPropagation(); location.reload(); });
@@ -299,7 +353,12 @@ function addEventListeners(panel: HTMLDivElement) {
   });
   $('op-style-dots').addEventListener('change', () => { if (($('op-style-dots') as HTMLInputElement).checked) { config.minifyStyle = 'dots'; saveConfig(['minifyStyle']); clearOverlayCache(); ensureHook(); }});
   $('op-style-symbols').addEventListener('change', () => { if (($('op-style-symbols') as HTMLInputElement).checked) { config.minifyStyle = 'symbols'; saveConfig(['minifyStyle']); clearOverlayCache(); ensureHook(); }});
+  $('op-place-chunk-x').addEventListener('change', () => { updatePlaceCoords(); });
+  $('op-place-chunk-y').addEventListener('change', () => { updatePlaceCoords(); });
+  $('op-place-coord-x').addEventListener('change', () => { updatePlaceCoords(); });
+  $('op-place-coord-y').addEventListener('change', () => { updatePlaceCoords(); });
 
+  $('op-place-clear-on-click').addEventListener('click', () => { config.autoCaptureClearOnClick = ($('op-place-clear-on-click') as HTMLInputElement).checked; saveConfig(['autoCaptureClearOnClick']); ensureHook(); })
   $('op-autocap-toggle').addEventListener('click', () => { config.autoCapturePixelUrl = !config.autoCapturePixelUrl; saveConfig(['autoCapturePixelUrl']); ensureHook(); updateUI(); });
 
   $('op-add-overlay').addEventListener('click', async () => { try { await addBlankOverlay(); } catch (e) { console.error(e); } });
@@ -307,8 +366,26 @@ function addEventListeners(panel: HTMLDivElement) {
   $('op-export-overlay').addEventListener('click', () => exportActiveOverlayToClipboard());
   $('op-collapse-list').addEventListener('click', () => { config.collapseList = !config.collapseList; saveConfig(['collapseList']); updateUI(); });
   $('op-collapse-editor').addEventListener('click', () => { config.collapseEditor = !config.collapseEditor; saveConfig(['collapseEditor']); updateUI(); });
-  $('op-collapse-positioning').addEventListener('click', () => { config.collapsePositioning = !config.collapsePositioning; saveConfig(['collapsePositioning']); updateUI(); });
+  $('op-collapse-mode').addEventListener('click', () => { config.collapseMode = !config.collapseMode; saveConfig(['collapseMode']); updateUI(); });
+  $('op-collapse-positioning') .addEventListener('click', () => { config.collapsePositioning = !config.collapsePositioning; saveConfig(['collapsePositioning']); updateUI(); });
+  $('op-collapse-colors') .addEventListener('click', () => { config.collapseColors = !config.collapseColors; saveConfig(['collapseColors']); updateUI(); });
 
+  const resizeObserver = new ResizeObserver(entries => {
+    for (let entry of entries) {
+      switch (entry.target.id) {
+        case 'op-overlay-list':
+          config.overlayListHeight = parseInt($('op-overlay-list').style.height); saveConfig(['overlayListHeight']);
+          break;
+        case 'op-color-filter':
+          config.ccListHeight = parseInt($('op-color-filter').style.height); saveConfig(['ccListHeight']);
+          break;
+      }
+      updateUI();
+    }
+  });
+  resizeObserver.observe($('op-overlay-list'));
+  resizeObserver.observe($('op-color-filter'));
+  
   $('op-name').addEventListener('change', async (e: any) => {
     const ov = getActiveOverlay(); if (!ov) return;
     const desired = (e.target.value || '').trim() || 'Overlay';
@@ -383,6 +460,10 @@ function addEventListeners(panel: HTMLDivElement) {
       openRSModal(ov);
     });
   }
+
+  $('op-colors-all').addEventListener('click', () => colorFilterPreset('all'));
+  $('op-colors-free').addEventListener('click', () => colorFilterPreset('free'));
+  $('op-colors-none').addEventListener('click', () => colorFilterPreset('none'));
 }
 
 function enableDrag(panel: HTMLDivElement) {
@@ -506,10 +587,10 @@ export function updateUI() {
   const fullOverlaySettings = $('op-mode-settings').querySelector('[data-setting="above"]') as HTMLDivElement;
   const minifySettings = $('op-mode-settings').querySelector('[data-setting="minify"]') as HTMLDivElement;
 
+  const ov = getActiveOverlay();
   if (config.overlayMode === 'above' || config.overlayMode === 'behind') {
     fullOverlaySettings.classList.add('active');
     minifySettings.classList.remove('active');
-    const ov = getActiveOverlay();
     if(ov) {
         ( $('op-opacity-slider') as HTMLInputElement ).value = String(ov.opacity);
         $('op-opacity-value').textContent = Math.round(ov.opacity * 100) + '%';
@@ -521,6 +602,9 @@ export function updateUI() {
     fullOverlaySettings.classList.remove('active');
     minifySettings.classList.remove('active');
   }
+
+  $('op-overlay-list').style.height = config.overlayListHeight + 'px';
+  $('op-color-filter').style.height = config.ccListHeight + 'px';
 
   ($('op-style-dots') as HTMLInputElement).checked = config.minifyStyle === 'dots';
   ($('op-style-symbols') as HTMLInputElement).checked = config.minifyStyle === 'symbols';
@@ -540,27 +624,50 @@ export function updateUI() {
 
 
   // --- Positioning Section ---
+  const clearAutoBtn = $('op-place-clear-on-click') as HTMLInputElement;
+  clearAutoBtn.checked = config.autoCaptureClearOnClick === true;
+
   const autoBtn = $('op-autocap-toggle');
   const placeLabel = $('op-place-label');
   autoBtn.textContent = config.autoCapturePixelUrl ? 'Enabled' : 'Disabled';
   autoBtn.classList.toggle('op-danger', !!config.autoCapturePixelUrl);
   if(placeLabel) placeLabel.classList.toggle('op-danger-text', !!config.autoCapturePixelUrl);
 
+  if (ov) {
+    const coords = ov.pixelUrl ? extractPixelCoords(ov.pixelUrl) : { chunk1: '', chunk2: '', posX: '', posY: '' } as any;
+    ($('op-place-chunk-x') as HTMLInputElement).value = coords.chunk1;
+    ($('op-place-chunk-y') as HTMLInputElement).value = coords.chunk2;
+    ($('op-place-coord-x') as HTMLInputElement).value = coords.posX;
+    ($('op-place-coord-y') as HTMLInputElement).value = coords.posY;
+  }
+
+  const autoGuide = $('op-place-guide');
+  autoGuide.style.display = config.autoCapturePixelUrl === true ? 'block' : 'none';
+
   const positioningBody = $('op-positioning-body');
   const positioningCz = $('op-collapse-positioning');
   if(positioningBody) positioningBody.style.display = config.collapsePositioning ? 'none' : 'block';
   if (positioningCz) positioningCz.textContent = config.collapsePositioning ? '▸' : '▾';
 
+  const modeBody = $('op-mode-settings');
+  const modeCz = $('op-collapse-mode');
+  if(modeBody) modeBody.style.display = config.collapseMode ? 'none' : 'block';
+  if (modeCz) modeCz.textContent = config.collapseMode ? '▸' : '▾';
+
   const listWrap = $('op-list-wrap');
   const listCz = $('op-collapse-list');
   listWrap.style.display = config.collapseList ? 'none' : 'block';
   if (listCz) listCz.textContent = config.collapseList ? '▸' : '▾';
+  
+  const colorsBody = $('op-colors-body');
+  const colorsCz = $('op-collapse-colors');
+  if(colorsBody) colorsBody.style.display = config.collapseColors ? 'none' : 'block';
+  if (colorsCz) colorsCz.textContent = config.collapseColors ? '▸' : '▾';
 
   rebuildOverlayListUI();
   updateEditorUI();
 
   const exportBtn = $('op-export-overlay') as HTMLButtonElement;
-  const ov = getActiveOverlay();
   const canExport = !!(ov && ov.imageUrl && !ov.isLocal);
   exportBtn.disabled = !canExport;
   exportBtn.title = canExport ? 'Export active overlay JSON' : 'Export disabled for local images';
@@ -597,4 +704,28 @@ function rebuildColorFilterUI() {
     container.appendChild(row);
   }
   container.style.display = 'flex';
+}
+
+async function colorFilterPreset(name) {
+  const ov = getActiveOverlay();
+  const stats = ov.colorStats;
+  const filter = ov.colorFilter || {};
+  const entries = Object.entries(stats).sort((a,b) => b[1]-a[1]);
+  const free = DEFAULT_FREE_KEYS;
+  const keys = Object.keys(filter);
+
+  switch(name) {
+    case 'all':
+      keys.forEach(key => ov.colorFilter[key] = true);
+      break;
+    case 'free':
+      keys.forEach(key => ov.colorFilter[key] = free.includes(key))
+      break;
+    case 'none':
+      keys.forEach(key => ov.colorFilter[key] = false);
+      break;
+  }
+  await saveConfig(['overlays']);
+  clearOverlayCache();
+  updateUI();
 }

@@ -24,12 +24,17 @@ export type Config = {
   minifyStyle: 'dots' | 'symbols';
   isPanelCollapsed: boolean;
   autoCapturePixelUrl: boolean;
+  autoCaptureClearOnClick: boolean;
   panelX: number | null;
   panelY: number | null;
   theme: 'light' | 'dark';
+  overlayListHeight: number | null;
+  ccListHeight: number | null
+  collapseMode: boolean;
   collapseList: boolean;
   collapseEditor: boolean;
   collapsePositioning: boolean;
+  collapseColors: boolean;
   ccFreeKeys: string[];
   ccPaidKeys: string[];
   ccZoom: number;
@@ -43,12 +48,17 @@ export const config: Config = {
   minifyStyle: 'dots',
   isPanelCollapsed: false,
   autoCapturePixelUrl: false,
+  autoCaptureClearOnClick: true,
   panelX: null,
   panelY: null,
   theme: 'light',
+  collapseMode: false,
   collapseList: false,
   collapseEditor: false,
   collapsePositioning: false,
+  collapseColors: true,
+  overlayListHeight: 100,
+  ccListHeight: 100,
   ccFreeKeys: DEFAULT_FREE_KEYS.slice(),
   ccPaidKeys: DEFAULT_PAID_KEYS.slice(),
   ccZoom: 1.0,

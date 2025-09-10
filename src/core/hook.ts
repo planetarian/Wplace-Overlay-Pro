@@ -47,7 +47,8 @@ export function attachHook() {
           await saveConfig(['overlays']);
 
           // turn off autocapture and notify UI (via events)
-          config.autoCapturePixelUrl = false;
+          if (config.autoCaptureClearOnClick)
+            config.autoCapturePixelUrl = false;
           await saveConfig(['autoCapturePixelUrl']);
 
           // keep legacy callback for any existing wiring

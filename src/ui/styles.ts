@@ -42,9 +42,9 @@ export function injectStyles() {
       .op-toggle-btn, .op-hdr-btn { background: transparent; border: 1px solid var(--op-border); color: var(--op-text); border-radius: 10px; padding: 4px 8px; cursor: pointer; }
       .op-toggle-btn:hover, .op-hdr-btn:hover { background: var(--op-btn); }
 
-      .op-content { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
-      .op-section { display: flex; flex-direction: column; gap: 8px; background: var(--op-subtle); border: 1px solid var(--op-border); border-radius: 12px; padding: 5px; }
-	  .op-section.resizable { display: flex; flex-direction: column; height: 300px; resize: vertical; overflow: hidden }
+      .op-content { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+      .op-section { display: flex; flex-direction: column; gap: 8px; background: var(--op-subtle); border: 1px solid var(--op-border); border-radius: 8px; padding: 5px; }
+	    .resizable { display: flex; flex-direction: column; resize: vertical; overflow: hidden; }
 
       .op-section-title { display: flex; align-items: center; justify-content: space-between; }
       .op-title-text { font-weight: 600; }
@@ -58,7 +58,7 @@ export function injectStyles() {
       .space-between { justify-content: space-between; }
       .op-small-text { font-size: 11px; color: var(--op-muted); }
 
-      .op-button { background: var(--op-btn); color: var(--op-text); border: 1px solid var(--op-btn-border); border-radius: 10px; padding: 6px 10px; cursor: pointer; }
+      .op-button { background: var(--op-btn); color: var(--op-text); border: 1px solid var(--op-btn-border); border-radius: 10px; padding: 3px 8px; cursor: pointer; }
       .op-button:hover { background: var(--op-btn-hover); }
       .op-button:disabled { opacity: 0.5; cursor: not-allowed; }
       .op-button.icon { width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
@@ -66,7 +66,7 @@ export function injectStyles() {
       .op-input, .op-select { background: var(--op-bg); border: 1px solid var(--op-border); color: var(--op-text); border-radius: 10px; padding: 6px 8px; }
       .op-slider { width: 100%; }
 
-      .op-list { display: flex; flex-direction: column; gap: 6px; height: 100%; overflow: auto; border: 1px solid var(--op-border); padding: 6px; border-radius: 10px; background: var(--op-bg); }
+      .op-list { display: flex; flex-direction: column; gap: 6px; min-height: 50px; overflow: auto; border: 1px solid var(--op-border); padding: 6px; border-radius: 10px; background: var(--op-bg); }
 
       .op-item { display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 8px; border: 1px solid var(--op-border); background: var(--op-subtle); }
       .op-item.active { outline: 2px solid color-mix(in oklab, var(--op-accent) 35%, transparent); background: var(--op-bg); }
@@ -75,12 +75,14 @@ export function injectStyles() {
       .op-muted { color: var(--op-muted); font-size: 12px; }
 
      .op-tabs { padding: 4px; border-bottom: 1px solid var(--op-border); }
-     .op-tab-btn { flex: 1; padding: 6px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--op-text); cursor: pointer; }
+     .op-tab-btn { flex: 1; padding: 3px 8px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--op-text); cursor: pointer; }
      .op-tab-btn:hover { background: var(--op-btn-hover); }
      .op-tab-btn.active { background: var(--op-btn); border-color: var(--op-btn-border); font-weight: 600; }
 
      .op-mode-setting { display: none; padding: 6px; }
      .op-mode-setting.active { display: flex; flex-direction: column; gap: 8px; }
+
+      .op-place-coords input { width: 100px; }
 
       .op-preview { width: 100%; height: 90px; background: var(--op-bg); display: flex; align-items: center; justify-content: center; border: 2px dashed color-mix(in oklab, var(--op-accent) 40%, var(--op-border)); border-radius: 10px; overflow: hidden; position: relative; cursor: pointer; }
       .op-preview img { max-width: 100%; max-height: 100%; display: block; pointer-events: none; }
@@ -90,7 +92,7 @@ export function injectStyles() {
       .op-icon-btn { background: var(--op-btn); color: var(--op-text); border: 1px solid var(--op-btn-border); border-radius: 10px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
       .op-icon-btn:hover { background: var(--op-btn-hover); }
 
-      .op-color-filter { display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow: auto; border: 1px solid var(--op-border); border-radius: 8px; padding: 4px; background: var(--op-bg); }
+      .op-color-filter { display: flex; flex-direction: column; gap: 4px; overflow: auto; border: 1px solid var(--op-border); border-radius: 8px; padding: 4px; background: var(--op-bg); }
       .op-color-row { display: flex; align-items: center; gap: 6px; }
       .op-color-swatch { width: 16px; height: 16px; border: 1px solid var(--op-border); border-radius: 4px; }
       .op-color-name { flex: 1; }
