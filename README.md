@@ -35,6 +35,23 @@ License: [`LICENSE.md`](LICENSE.md:1)
 - Persistent settings via GM storage (script stores overlays, UI positions, palettes, etc.).
 - Draggable, collapsible UI panel with preview, palette editor, and tools.
 
+### Added in `CreepsoOff` fork:
+- Color filters
+- Resizable Overlays list
+- Symbol mode performance optimizations
+- Coordinate copy button
+
+### Added in `planetarian` fork:
+- Fixed resizable overlay list (Resizer no longer applies when collapsed)
+- Made color filter list resizable
+- Resizing now persists
+- Added manual coordinate entry (and reorganized positioning panel)
+- Added a toggle for click-to-place mode deactivating after placement
+- Moved color filter to separate panel
+- Added color filter preset buttons
+- Made display mode panel collapsible
+- Tweaked spacings on sections/buttons for compactness
+
 ---
 
 ## Installation
