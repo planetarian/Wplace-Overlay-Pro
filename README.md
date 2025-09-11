@@ -42,14 +42,15 @@ License: [`LICENSE.md`](LICENSE.md:1)
 - Coordinate copy button
 
 ### Added in `planetarian` fork:
-- Fixed resizable overlay list (Resizer no longer applies when collapsed)
-- Made color filter list resizable
-- Resizing now persists
 - Added manual coordinate entry (and reorganized positioning panel)
+- Added buttons to the overlay list to navigate directly to the overlay in the map
 - Added a toggle for click-to-place mode deactivating after placement
-- Moved color filter to separate panel
 - Added color filter preset buttons
+- Made overlay preview and color filter list resizable
+- Resizing now persists
+- Fixed resizable overlay list (Resizer no longer applies when collapsed)
 - Made display mode panel collapsible
+- Moved color filter to separate panel
 - Tweaked spacings on sections/buttons for compactness
 
 ---
