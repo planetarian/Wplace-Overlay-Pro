@@ -66,10 +66,11 @@ export function injectStyles() {
       .op-input, .op-select { background: var(--op-bg); border: 1px solid var(--op-border); color: var(--op-text); border-radius: 10px; padding: 6px 8px; }
       .op-slider { width: 100%; }
 
-      .op-list { display: flex; flex-direction: column; gap: 6px; min-height: 50px; overflow: auto; border: 1px solid var(--op-border); padding: 6px; border-radius: 10px; background: var(--op-bg); }
+      .op-list { display: flex; flex-direction: column; min-height: 50px; overflow: auto; border: 1px solid var(--op-border); border-radius: 10px; background: var(--op-bg); }
 
-      .op-item { display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 8px; border: 1px solid var(--op-border); background: var(--op-subtle); }
-      .op-item.active { outline: 2px solid color-mix(in oklab, var(--op-accent) 35%, transparent); background: var(--op-bg); }
+      .op-item { display: flex; align-items: center; gap: 6px; padding: 3px; border-bottom: 1px solid var(--op-border); background: var(--op-subtle); }
+      .op-item .op-icon-btn { width: 26px; height: 26px; border-radius: 4px; }
+      .op-item.active { background: var(--op-border); }
       .op-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
       .op-muted { color: var(--op-muted); font-size: 12px; }

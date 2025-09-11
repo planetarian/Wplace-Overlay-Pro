@@ -29,7 +29,8 @@ export type Config = {
   panelY: number | null;
   theme: 'light' | 'dark';
   overlayListHeight: number | null;
-  ccListHeight: number | null
+  ccListHeight: number | null;
+  imagePreviewHeight: number | null;
   collapseMode: boolean;
   collapseList: boolean;
   collapseEditor: boolean;
@@ -59,6 +60,7 @@ export const config: Config = {
   collapseColors: true,
   overlayListHeight: 100,
   ccListHeight: 100,
+  imagePreviewHeight: 100,
   ccFreeKeys: DEFAULT_FREE_KEYS.slice(),
   ccPaidKeys: DEFAULT_PAID_KEYS.slice(),
   ccZoom: 1.0,

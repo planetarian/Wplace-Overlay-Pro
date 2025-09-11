@@ -6,6 +6,7 @@ import { createUI, updateUI } from './ui/panel';
 import { displayImageFromData } from './core/overlay';
 import { showToast } from './core/toast';
 import { urlToDataURL } from './core/gm';
+import { setResponseIntercept } from './core/navigation';
 
 async function applyTemplateFromUrl() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -61,6 +62,7 @@ export async function bootstrapApp() {
   injectStyles();
   await loadConfig();
   applyTheme();
+  setResponseIntercept();
   createUI();
   setUpdateUI(() => updateUI());
   ensureHook();

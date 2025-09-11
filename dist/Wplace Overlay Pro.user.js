@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wplace Overlay Pro
 // @namespace    http://tampermonkey.net/
-// @version      3.1.5.1
+// @version      3.1.5.2
 // @description  Overlays tiles on wplace.live. Can also resize, and color-match your overlay to wplace's palette. Make sure to comply with the site's Terms of Service, and rules! This script is not affiliated with Wplace.live in any way, use at your own risk. This script is not affiliated with TamperMonkey. The author of this userscript is not responsible for any damages, issues, loss of data, or punishment that may occur as a result of using this script. This script is provided "as is" under GPLv3.
 // @author       shinkonet, CreepsoOff, Chami
 // @match        https://wplace.live/*
@@ -235,6 +235,7 @@
     collapseColors: true,
     overlayListHeight: 100,
     ccListHeight: 100,
+    imagePreviewHeight: 100,
     ccFreeKeys: DEFAULT_FREE_KEYS.slice(),
     ccPaidKeys: DEFAULT_PAID_KEYS.slice(),
     ccZoom: 1,
@@ -1050,10 +1051,11 @@
       .op-input, .op-select { background: var(--op-bg); border: 1px solid var(--op-border); color: var(--op-text); border-radius: 10px; padding: 6px 8px; }
       .op-slider { width: 100%; }
 
-      .op-list { display: flex; flex-direction: column; gap: 6px; min-height: 50px; overflow: auto; border: 1px solid var(--op-border); padding: 6px; border-radius: 10px; background: var(--op-bg); }
+      .op-list { display: flex; flex-direction: column; min-height: 50px; overflow: auto; border: 1px solid var(--op-border); border-radius: 10px; background: var(--op-bg); }
 
-      .op-item { display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 8px; border: 1px solid var(--op-border); background: var(--op-subtle); }
-      .op-item.active { outline: 2px solid color-mix(in oklab, var(--op-accent) 35%, transparent); background: var(--op-bg); }
+      .op-item { display: flex; align-items: center; gap: 6px; padding: 3px; border-bottom: 1px solid var(--op-border); background: var(--op-subtle); }
+      .op-item .op-icon-btn { width: 26px; height: 26px; border-radius: 4px; }
+      .op-item.active { background: var(--op-border); }
       .op-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
       .op-muted { color: var(--op-muted); font-size: 12px; }
@@ -1206,6 +1208,18 @@
     let i = 1;
     while (names.has(`${base} (${i})`.toLowerCase())) i++;
     return `${base} (${i})`;
+  }
+  function fetchImageDimensions(imageData) {
+    return new Promise((resolve, reject) => {
+      var image = new Image();
+      image.onload = function() {
+        resolve({ width: image.width, height: image.height });
+      };
+      image.onerror = function() {
+        reject(new Error("Image failed to load"));
+      };
+      image.src = imageData;
+    });
   }
 
   // src/ui/ccModal.ts
@@ -2473,6 +2487,36 @@
     emitOverlayChanged2();
   }
 
+  // src/core/navigation.ts
+  var EXPLORE_URI = "https://backend.wplace.live/s0/tile/random";
+  var originalJson = Response.prototype.json;
+  var forceLocation;
+  function setDestinationLocation(location2) {
+    forceLocation = location2;
+  }
+  function setResponseIntercept() {
+    Response.prototype.json = async function() {
+      if (!this.url || this.url.length === 0) {
+        return originalJson.call(this);
+      }
+      if (!!forceLocation && this.url === EXPLORE_URI) {
+        const location2 = {
+          pixel: {
+            x: forceLocation.posX,
+            y: forceLocation.posY
+          },
+          tile: {
+            x: forceLocation.chunk1,
+            y: forceLocation.chunk2
+          }
+        };
+        forceLocation = null;
+        return location2;
+      }
+      return originalJson.call(this);
+    };
+  }
+
   // src/ui/panel.ts
   var panelEl = null;
   function $(id) {
@@ -2617,7 +2661,7 @@
               </div>
             </div>
 
-            <div class="op-preview" id="op-preview-wrap" style="display:none;">
+            <div class="op-preview resizable" id="op-preview-wrap" style="display:none;">
               <img id="op-image-preview" alt="No image">
             </div>
 
@@ -2676,9 +2720,10 @@
         <input type="radio" name="op-active" ${ov.id === config.activeOverlayId ? "checked" : ""} title="Set active"/>
         <input type="checkbox" ${ov.enabled ? "checked" : ""} title="Toggle enabled"/>
         <div class="op-item-name" title="${(ov.name || "(unnamed)") + localTag}">${(ov.name || "(unnamed)") + localTag}</div>
-        <button class="op-icon-btn" title="Delete overlay">\u{1F5D1}\uFE0F</button>
+        <button class="op-icon-btn op-overlay-navigate" title="Go to location">\u{1F4CD}</button>
+        <button class="op-icon-btn op-overlay-delete" title="Delete overlay">\u2716</button>
     `;
-      const [radio, checkbox, nameDiv, trashBtn] = item.children;
+      const [radio, checkbox, nameDiv, navBtn, trashBtn] = item.children;
       radio.addEventListener("change", async () => {
         config.activeOverlayId = ov.id;
         await saveConfig(["activeOverlayId"]);
@@ -2695,6 +2740,30 @@
         config.activeOverlayId = ov.id;
         await saveConfig(["activeOverlayId"]);
         updateUI();
+      });
+      navBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const coords = ov.pixelUrl ? extractPixelCoords(ov.pixelUrl) : { chunk1: "-", chunk2: "-", posX: "-", posY: "-" };
+        if (Object.keys(coords).some((key) => coords[key] === void 0 || coords[key] === "-"))
+          return;
+        try {
+          const dim = await fetchImageDimensions(ov.imageBase64);
+          coords.posX += dim.width / 2;
+          while (coords.posX >= 1e3) {
+            coords.posX -= 1e3;
+            coords.chunk1++;
+          }
+          coords.posY += dim.height / 2;
+          while (coords.posY >= 1e3) {
+            coords.posY -= 1e3;
+            coords.chunk2++;
+          }
+        } catch (error) {
+          console.error("couldn't get image dimensions.", error);
+        }
+        setDestinationLocation(coords);
+        const exploreBtn = document.querySelector("button[title='Explore']");
+        exploreBtn.dispatchEvent(new Event("click", { bubbles: true, cancelable: true }));
       });
       trashBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
@@ -2949,12 +3018,17 @@
             config.ccListHeight = parseInt($("op-color-filter").style.height);
             saveConfig(["ccListHeight"]);
             break;
+          case "op-preview-wrap":
+            config.imagePreviewHeight = parseInt($("op-preview-wrap").style.height);
+            saveConfig(["imagePreviewHeight"]);
+            break;
         }
         updateUI();
       }
     });
     resizeObserver.observe($("op-overlay-list"));
     resizeObserver.observe($("op-color-filter"));
+    resizeObserver.observe($("op-preview-wrap"));
     $("op-name").addEventListener("change", async (e) => {
       const ov = getActiveOverlay();
       if (!ov) return;
@@ -3222,6 +3296,7 @@
     }
     $("op-overlay-list").style.height = config.overlayListHeight + "px";
     $("op-color-filter").style.height = config.ccListHeight + "px";
+    $("op-preview-wrap").style.height = config.imagePreviewHeight + "px";
     $("op-style-dots").checked = config.minifyStyle === "dots";
     $("op-style-symbols").checked = config.minifyStyle === "symbols";
     const layeringBtns = $("op-layering-btns");
@@ -3396,6 +3471,7 @@
     injectStyles();
     await loadConfig();
     applyTheme();
+    setResponseIntercept();
     createUI();
     setUpdateUI(() => updateUI());
     ensureHook();

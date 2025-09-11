@@ -4,13 +4,14 @@ import { ensureHook } from '../core/hook';
 import { clearOverlayCache } from '../core/cache';
 import { showToast } from '../core/toast';
 import { urlToDataURL, fileToDataURL } from '../core/gm';
-import { uniqueName, uid } from '../core/util';
+import { uniqueName, uid, fetchImageDimensions } from '../core/util';
 import { extractPixelCoords, getPixelUrl } from '../core/overlay';
 import { buildCCModal, openCCModal } from './ccModal';
 import { buildRSModal, openRSModal } from './rsModal';
 import { EV_ANCHOR_SET, EV_AUTOCAP_CHANGED } from '../core/events';
 import { updateOverlayColorStats, rgbKeyToHex } from '../core/colorFilter';
 import { DEFAULT_FREE_KEYS, WPLACE_NAMES } from '../core/palette';
+import { setDestinationLocation } from '../core/navigation';
 
 let panelEl: HTMLDivElement | null = null;
 
@@ -158,7 +159,7 @@ export function createUI() {
               </div>
             </div>
 
-            <div class="op-preview" id="op-preview-wrap" style="display:none;">
+            <div class="op-preview resizable" id="op-preview-wrap" style="display:none;">
               <img id="op-image-preview" alt="No image">
             </div>
 
@@ -223,14 +224,43 @@ function rebuildOverlayListUI() {
         <input type="radio" name="op-active" ${ov.id === config.activeOverlayId ? 'checked' : ''} title="Set active"/>
         <input type="checkbox" ${ov.enabled ? 'checked' : ''} title="Toggle enabled"/>
         <div class="op-item-name" title="${(ov.name || '(unnamed)') + localTag}">${(ov.name || '(unnamed)') + localTag}</div>
-        <button class="op-icon-btn" title="Delete overlay">🗑️</button>
+        <button class="op-icon-btn op-overlay-navigate" title="Go to location">📍</button>
+        <button class="op-icon-btn op-overlay-delete" title="Delete overlay">✖</button>
     `;
-    const [radio, checkbox, nameDiv, trashBtn] = item.children as any as [HTMLInputElement, HTMLInputElement, HTMLDivElement, HTMLButtonElement];
+    const [radio, checkbox, nameDiv, navBtn, trashBtn] = item.children as any as [HTMLInputElement, HTMLInputElement, HTMLDivElement, HTMLButtonElement, HTMLButtonElement];
     radio.addEventListener('change', async () => { config.activeOverlayId = ov.id; await saveConfig(['activeOverlayId']); updateUI(); });
     checkbox.addEventListener('change', async () => {
       ov.enabled = checkbox.checked; await saveConfig(['overlays']); clearOverlayCache(); ensureHook(); updateUI();
     });
     nameDiv.addEventListener('click', async () => { config.activeOverlayId = ov.id; await saveConfig(['activeOverlayId']); updateUI(); });
+    navBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const coords = ov.pixelUrl ? extractPixelCoords(ov.pixelUrl) : { chunk1: '-', chunk2: '-', posX: '-', posY: '-' } as any;
+      if (Object.keys(coords).some(key => coords[key] === undefined || coords[key] === '-'))
+        return;
+
+      try {
+        const dim = await fetchImageDimensions(ov.imageBase64);
+        coords.posX += dim.width/2;
+        while (coords.posX >= 1000) {
+          coords.posX -= 1000;
+          coords.chunk1++;
+        }
+        coords.posY += dim.height/2;
+        while (coords.posY >= 1000) {
+          coords.posY -= 1000;
+          coords.chunk2++;
+        }
+      }
+      catch (error) {
+        console.error("couldn't get image dimensions.", error);
+      }
+
+      setDestinationLocation(coords);
+      // Send click event to the explore button; we've got an intercept set up on `Response.json` to inject our custom location
+      const exploreBtn = document.querySelector("button[title='Explore']");
+      exploreBtn.dispatchEvent(new Event("click", { bubbles: true, cancelable: true }));
+    });
     trashBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       if (!confirm(`Delete overlay "${ov.name || '(unnamed)'}"?`)) return;
@@ -379,12 +409,16 @@ function addEventListeners(panel: HTMLDivElement) {
         case 'op-color-filter':
           config.ccListHeight = parseInt($('op-color-filter').style.height); saveConfig(['ccListHeight']);
           break;
+        case 'op-preview-wrap':
+          config.imagePreviewHeight = parseInt($('op-preview-wrap').style.height); saveConfig(['imagePreviewHeight']);
+          break;
       }
       updateUI();
     }
   });
   resizeObserver.observe($('op-overlay-list'));
   resizeObserver.observe($('op-color-filter'));
+  resizeObserver.observe($('op-preview-wrap'));
   
   $('op-name').addEventListener('change', async (e: any) => {
     const ov = getActiveOverlay(); if (!ov) return;
@@ -605,6 +639,8 @@ export function updateUI() {
 
   $('op-overlay-list').style.height = config.overlayListHeight + 'px';
   $('op-color-filter').style.height = config.ccListHeight + 'px';
+  $('op-preview-wrap').style.height = config.imagePreviewHeight + 'px';
+
 
   ($('op-style-dots') as HTMLInputElement).checked = config.minifyStyle === 'dots';
   ($('op-style-symbols') as HTMLInputElement).checked = config.minifyStyle === 'symbols';

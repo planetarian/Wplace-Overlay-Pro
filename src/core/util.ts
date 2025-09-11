@@ -9,3 +9,19 @@ export function uniqueName(base: string, existing: string[]) {
   while (names.has(`${base} (${i})`.toLowerCase())) i++;
   return `${base} (${i})`;
 }
+
+export function fetchImageDimensions(imageData): any {
+    return new Promise((resolve, reject) => {
+        var image = new Image();
+        
+        image.onload = function() {
+            resolve({ width: image.width, height: image.height });
+        };
+
+        image.onerror = function() {
+            reject(new Error("Image failed to load"));
+        };
+
+        image.src = imageData; // Set source 
+    });
+}
